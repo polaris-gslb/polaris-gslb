@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Polaris health tracker control script"""
+
+import argparse
+import os
+import errno
+import signal
+import time
+import inspect
+import re
+import logging
+
+import daemon
+
+import polaris
+import polaris.util.logging
+import polaris.health
+
+# seconds to wait during restart between stopping and starting
+RESTART_WAIT = 5
+
+# determine directory path prefix where polaris is installed
+path = os.path.abspath(
+    os.path.split(inspect.getfile( inspect.currentframe() ))[0])
+m = re.search(r'(.+)\/bin', path)
+if m:
+   PREFIX  = m.group(1)
+else:
+    raise Exception('Cannot determine the installation directory prefix')
+
+def main():
+    # get command line arguments
+    parser = argparse.ArgumentParser(description="Polaris health tracker")
+
+    parser.add_argument('action',
+                        choices=['start', 'stop', 'restart']) 
+
+    parser.add_argument('-d',
+                        action='store_true',
+                        help='do not daemonize, output debug to console') 
+
+    opts = parser.parse_args()
+
+   # load configuration
+    polaris.config.load(
+        base_config_path='{}/etc/polaris/base.yaml'.format(PREFIX),
+        lb_config_path='{}/etc/polaris/lb.yaml'.format(PREFIX),
+        topology_config_path='{}/etc/polaris/topology.yaml'.format(PREFIX))
+
+    if opts.action == 'start':
+        start(debug=opts.d)
+    elif opts.action == 'stop':
+        stop()
+    elif opts.action == 'restart':
+        restart(debug=opts.d)
+
+def start(debug=False):
+    """Start the health tracker
+
+    args: debug, bool, when True th ehealth tracker will not daemonize,
+    debug log is sent to stdout
+    """
+    # check if the pid file exists
+    if os.path.isfile(polaris.config.base['health_tracker']['pid_file']):
+        # check if the process with the pid exists
+        with open(polaris.config.base['health_tracker']['pid_file']) as fp:
+            pid = int(fp.read())
+
+        # send process signal 0
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            # no such process, continue execution    
+            pass
+        else:
+            # no error means a process with this pid is running
+            raise Exception('Health Tracker is already running? ' 
+                            'If not, remove {} before attempting to start'
+                            .format(polaris.config.base[
+                                'health_tracker']['pid_file']))
+
+    # debug foreground mode
+    if debug:
+        # setup debug logging(console)
+        polaris.util.logging.setup_debug()
+        # run health tracker in the foreground    
+        polaris.health.main()
+
+    # normal daemon mode
+    else:
+        # setup logging    
+        if polaris.config.base['health_tracker']['log_level'] != 'none':
+            polaris.util.logging.setup(
+                level=polaris.config.base['health_tracker']['log_level'],
+                handler=polaris.config.base['logging']['handler'],
+                hostname=polaris.config.base['logging']['hostname'],
+                port=polaris.config.base['logging']['port'])
+
+        # run health tracker as a daemon
+        with daemon.DaemonContext():
+            polaris.health.main()
+
+def stop():
+    """Stop the health tracker"""
+    # get the Reactor PID
+    with open(polaris.config.base['health_tracker']['pid_file']) as fp:
+        pid = int(fp.read())
+
+    # signal reactor to exit
+    os.kill(pid, signal.SIGHUP)
+
+def restart(debug=False):
+    """Restart the health tracker"""
+    stop()
+    time.sleep(RESTART_WAIT)
+    start()
+
+if __name__ == '__main__':
+    main()
+
