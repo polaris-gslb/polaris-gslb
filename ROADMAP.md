@@ -31,5 +31,6 @@
 - Add new pool `fallback` option `nodata`
  - Return `NOERROR` with no data in DNS response
 - Make `polaris-health restart` to watch pid file instead of using a constant delay
+- Review and improve logging messages
 - Review the default monitor option values
 - Review the internal tracker timers under a large number of end-points loaded
