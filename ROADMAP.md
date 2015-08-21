@@ -1,7 +1,7 @@
 ## 0.3
-- Split polaris-core into two individual repositories
- - polaris-health - generic GSLB end-point configuration and health monitoring 
- - polaris-pdns - PowerDNS Remote Backend distributor plugin(to be eventually re-written in a compiled language e.g. Go)
+- Split polaris into two individual packages
+ - polaris_health - generic GSLB end-point configuration and health monitoring 
+ - polaris_pdns - PowerDNS Remote Backend distributor plugin(to be eventually re-written in a compiled language e.g. Go)
 - Make polaris-health to expose the health state table into a shared memory using various formats, controlled by a plugin architecture
  - Implement generic plugin that will push a JSON representation containing every attribute of the health state table, this can be used for monitoring or other applications requiring to track health state of end-points  
  - Implement polaris-pdns plugin that will push a pickled dictionary representation ready to be used by polaris-pdns PowerDNS plugin 
