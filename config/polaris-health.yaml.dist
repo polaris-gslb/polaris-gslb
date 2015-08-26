@@ -1,0 +1,25 @@
+################################
+# number of prober processes to run
+#
+# NUM_PROBERS: 50
+
+################################
+# log level, one of "none"(disables logging), "info", "debug", "warning", "error"
+#
+# LOG_LEVEL: info
+
+################################
+# where to send logs to, one of "syslog", "datagram"(udp)
+#
+# LOG_HANDLER: syslog
+
+################################
+# hostname to use with the datagram handler
+#
+# LOG_HOSTNAME: 127.0.0.1
+
+################################
+# port to use with the datagram handler
+#
+# LOG_PORT: 2222
+

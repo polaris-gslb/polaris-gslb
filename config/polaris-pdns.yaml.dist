@@ -1,0 +1,5 @@
+################################
+# hostname to use when generating a SOA response
+#
+# HOSTNAME: polaris.example.com
+

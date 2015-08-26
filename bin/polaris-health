@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Polaris health tracker control script"""
+"""Polaris health control script"""
 
 import argparse
 import os
@@ -12,21 +12,26 @@ import inspect
 import re
 import logging
 
+import yaml
 import daemon
 
-import polaris
-import polaris.util.logging
-import polaris.health
+import polaris_health
+import polaris_health.config
+import polaris_health.util.logging
+from polaris_health.util import topology
 
-# seconds to wait during restart between stopping and starting
-RESTART_WAIT = 5
+PID_FILE = '/run/polaris-health.pid'
+
+# maximum seconds to wait for the pid file to be deleted
+# after stopping the health tracker
+RESTART_TIMEOUT = 10
 
 # determine directory path prefix where polaris is installed
 path = os.path.abspath(
     os.path.split(inspect.getfile( inspect.currentframe() ))[0])
 m = re.search(r'(.+)\/bin', path)
 if m:
-   PREFIX  = m.group(1)
+   INSTALL_PREFIX  = m.group(1)
 else:
     raise Exception('Cannot determine the installation directory prefix')
 
@@ -43,12 +48,37 @@ def main():
 
     opts = parser.parse_args()
 
-   # load configuration
-    polaris.config.load(
-        base_config_path='{}/etc/polaris/base.yaml'.format(PREFIX),
-        lb_config_path='{}/etc/polaris/lb.yaml'.format(PREFIX),
-        topology_config_path='{}/etc/polaris/topology.yaml'.format(PREFIX))
+    # load BASE configuration
+    base_config_file = '{}/etc/polaris-health.yaml'.format(INSTALL_PREFIX)
+    if os.path.isfile(base_config_file):
+        with open(base_config_file) as fp:
+            _base = yaml.load(fp)
 
+        # validate and set values
+        for k in _base:
+            if k not in polaris_health.config.BASE:
+                raise Exception('unknown configuration option "{}"'.format(k))
+            else:
+                polaris_health.config.BASE[k] = _base[k]
+
+    # load LB configuration
+    lb_config_file = '{}/etc/polaris-lb.yaml'.format(INSTALL_PREFIX)
+    if not os.path.isfile(lb_config_file):
+        raise Exception('{} does not exist'.format(lb_config_file))
+    else:
+        with open(lb_config_file) as fp:
+            polaris_health.config.LB = yaml.load(fp)
+
+    # load TOPOLOGY_MAP configuration
+    topology_config_file = '{}/etc/polaris-topology.yaml'.format(INSTALL_PREFIX)
+    if os.path.isfile(topology_config_file):
+        with open(topology_config_file) as fp:
+            topology_config = yaml.load(fp)
+
+        polaris_health.config.TOPOLOGY_MAP = \
+            topology.config_to_map(topology_config)
+
+    # perform an action
     if opts.action == 'start':
         start(debug=opts.d)
     elif opts.action == 'stop':
@@ -59,13 +89,13 @@ def main():
 def start(debug=False):
     """Start the health tracker
 
-    args: debug, bool, when True th ehealth tracker will not daemonize,
+    args: debug, bool, when True the health tracker will not daemonize,
     debug log is sent to stdout
     """
     # check if the pid file exists
-    if os.path.isfile(polaris.config.base['health_tracker']['pid_file']):
+    if os.path.isfile(PID_FILE):
         # check if the process with the pid exists
-        with open(polaris.config.base['health_tracker']['pid_file']) as fp:
+        with open(PID_FILE) as fp:
             pid = int(fp.read())
 
         # send process signal 0
@@ -76,46 +106,69 @@ def start(debug=False):
             pass
         else:
             # no error means a process with this pid is running
-            raise Exception('Health Tracker is already running? ' 
+            raise Exception('Polaris health is already running? ' 
                             'If not, remove {} before attempting to start'
-                            .format(polaris.config.base[
-                                'health_tracker']['pid_file']))
+                            .format(PID_FILE))
 
     # debug foreground mode
     if debug:
         # setup debug logging(console)
-        polaris.util.logging.setup_debug()
+        polaris_health.util.logging.setup_debug()
         # run health tracker in the foreground    
-        polaris.health.main()
+        polaris_health.main()
 
     # normal daemon mode
     else:
         # setup logging    
-        if polaris.config.base['health_tracker']['log_level'] != 'none':
-            polaris.util.logging.setup(
-                level=polaris.config.base['health_tracker']['log_level'],
-                handler=polaris.config.base['logging']['handler'],
-                hostname=polaris.config.base['logging']['hostname'],
-                port=polaris.config.base['logging']['port'])
+        polaris_health.util.logging.setup()
 
         # run health tracker as a daemon
         with daemon.DaemonContext():
-            polaris.health.main()
+            polaris_health.main()
+
+        # exit the main thread
+        exit()
 
 def stop():
     """Stop the health tracker"""
-    # get the Reactor PID
-    with open(polaris.config.base['health_tracker']['pid_file']) as fp:
-        pid = int(fp.read())
 
+    # check if pid file exists
+    if not os.path.isfile(PID_FILE):
+        raise Exception('Unable to stop, {} file does not exist'
+                        .format(PID_FILE))
+
+    # get the Reactor PID
+    with open(PID_FILE) as fp:
+        pid = int(fp.read())
+        
     # signal reactor to exit
-    os.kill(pid, signal.SIGHUP)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        raise Exception('{} is present and showing PID {}, '
+                        'but no process with this PID exists'
+                        .format(PID_FILE, pid))
 
 def restart(debug=False):
     """Restart the health tracker"""
+    # stop the health tracker
     stop()
-    time.sleep(RESTART_WAIT)
-    start()
+
+    # wait until the pid file has been deleted 
+    # and then start the health tracker
+    time.sleep(1)
+    remaining_timeout = RESTART_TIMEOUT - 1
+    while remaining_timeout > 0:
+        if os.path.isfile(PID_FILE):
+            remaining_timeout -= 0.5
+            time.sleep(0.5)
+            continue
+        else:
+            start()
+
+    # pid file hasn't been deleted within RESTART_TIMEOUT    
+    raise Exception('Timeout waiting for {} to be deleted'
+                    .format(PID_FILE))
 
 if __name__ == '__main__':
     main()
