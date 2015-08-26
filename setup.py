@@ -1,21 +1,26 @@
 import os
+import sys
 import inspect
 from shutil import copy
 
 from setuptools import setup, find_packages
 
-PREFIX = '/opt/polaris'
+INSTALL_PREFIX = '/opt/polaris'
 
 # determine directory where setup.py is located
 PWD = os.path.abspath(
     os.path.split(inspect.getfile( inspect.currentframe( ) ))[0])
 
+# load version
+sys.path.insert(0, PWD)
+from version import version
+
 setup (
-    version='0.2.2',
+    version=version,
     author='Anton Gavrik',    
     name='polaris',
-    description='DNS-based traffic manager',
-    packages=find_packages('.'),
+    description='DNS-based traffic manager(GSLB)',
+    packages = find_packages('.'),
     install_requires=[
         'pyyaml',
         'python3-memcached', 
@@ -25,9 +30,9 @@ setup (
 
 # create directories
 for path in [ 
-        '{}/etc/polaris'.format(PREFIX),
-        '{}/bin'.format(PREFIX),
-        '{}/var/run'.format(PREFIX)
+        '{}/etc'.format(INSTALL_PREFIX),
+        '{}/bin'.format(INSTALL_PREFIX),
+        '{}/run'.format(INSTALL_PREFIX)
         ]:
     try:
         os.makedirs(path)
@@ -35,23 +40,25 @@ for path in [
         continue
 
 # copy configuration files
-copy('{}/config/base.yaml.dist'.format(PWD), 
-     '{}/etc/polaris'.format(PREFIX))
+copy('{}/config/polaris-health.yaml.dist'.format(PWD), 
+     '{}/etc'.format(INSTALL_PREFIX))
 
-copy('{}/config/lb.yaml.dist'.format(PWD), 
-     '{}/etc/polaris'.format(PREFIX))
+copy('{}/config/polaris-lb.yaml.dist'.format(PWD), 
+     '{}/etc'.format(INSTALL_PREFIX))
 
-copy('{}/config/topology.yaml.dist'.format(PWD), 
-     '{}/etc/polaris'.format(PREFIX))
+copy('{}/config/polaris-topology.yaml.dist'.format(PWD), 
+     '{}/etc'.format(INSTALL_PREFIX))
+
+copy('{}/config/polaris-pdns.yaml.dist'.format(PWD), 
+     '{}/etc'.format(INSTALL_PREFIX))
 
 # copy executables
 copy('{}/bin/polaris-health'.format(PWD),
-     '{}/bin'.format(PREFIX))
+     '{}/bin'.format(INSTALL_PREFIX))
 
-copy('{}/bin/polaris-distributor'.format(PWD),
-     '{}/bin'.format(PREFIX))
+copy('{}/bin/polaris-pdns'.format(PWD),
+     '{}/bin'.format(INSTALL_PREFIX))
 
-copy('{}/bin/check-polaris'.format(PWD),
-     '{}/bin'.format(PREFIX))
-
+copy('{}/bin/check-polaris-health'.format(PWD),
+     '{}/bin'.format(INSTALL_PREFIX))
 
