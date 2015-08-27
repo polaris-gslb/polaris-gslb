@@ -7,7 +7,7 @@ import queue
 
 import memcache
 
-from polaris_health import config, state
+from polaris_health import config, state, util
 from .probe import Probe
 
 LOG = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class Tracker(multiprocessing.Process):
         self.probe_response_queue = probe_response_queue
 
         # create health state table from the lb config
-        self._state = state.State(config_obj=config.LB)
+        self.state = state.State(config_obj=config.LB)
 
         # init shared memory client(memcache.Client arg must be a list)
         self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
@@ -56,7 +56,7 @@ class Tracker(multiprocessing.Process):
         # Track whether status of any of the backend servers changed.
         # If the state has changed we will push it to share _mem, but no more
         # often than SCAN_STATE_INTERVAL
-        self._state_changed = False
+        self.state_changed = False
 
         while True:
             # read probe response and process it
@@ -77,22 +77,27 @@ class Tracker(multiprocessing.Process):
                 # update last scan state time
                 last_scan_state_time = time.time()
 
-                # if the state changed, push it's distribution representation 
-                # to the shared memory
-                if self._state_changed:
-                    # push state
+                # if the state changed, push it to the shared memory
+                if self.state_changed:
+
+                    # push PPDSN distribution state
                     self._sm.set(
                         config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
-                        self._state.to_dist_dict())
+                        self.state.to_dist_dict())
+
+                    # push generic state
+                    self._sm.set(
+                        config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
+                        util.instance_to_dict(self.state))
 
                     # reset state changed flag
-                    self._state_changed = False
+                    self.state_changed = False
 
                     LOG.debug('synced state, version to the shared memory')
  
                 # iterate the state, issue new probe requests
                 self._scan_state()
- 
+
     def _process_probe(self, probe):
         """Process a probe, change the associated member status accordingly.
         
@@ -104,8 +109,11 @@ class Tracker(multiprocessing.Process):
 
         # get a reference to the individual pool member 
         # based on pool_name and member_ip
-        member = self._state.pools[probe.pool_name].members[probe.member_ip]    
+        member = self.state.pools[probe.pool_name].members[probe.member_ip]    
 
+        # set member status attributes 
+        member.status_reason = probe.status_reason
+        
         ### probe success ###
         if probe.status:
             # if member is in UP state, do nothing and return
@@ -118,7 +126,7 @@ class Tracker(multiprocessing.Process):
                 # set retries left to the value of the parent's pool 
                 # monitor retries
                 member.retries_left = \
-                    self._state.pools[probe.pool_name].monitor.retries
+                    self.state.pools[probe.pool_name].monitor.retries
 
         ### probe failed ###
         else:
@@ -140,19 +148,20 @@ class Tracker(multiprocessing.Process):
 
         # if we end up here, it means that there was a status change,
         # indicate that the overall state changed
-        self._state_changed = True
-        LOG.info('member "{}"({}) of pool "{}" is {} on probe, reason "{}"'
+        self.state_changed = True
+        LOG.info('pool member status change: '
+                 'member "{}"({}) of pool "{}" is {}, reason: "{}"'
                  .format(probe.member_ip, member.name, probe.pool_name, 
                          state.pool.pprint_status(member.status),
-                         probe.status_reason))
+                         member.status_reason))
         # check if this change affects the overall pool's status
         # and generate a log message if it does
-        self._change_pool_last_status(self._state.pools[probe.pool_name])
+        self._change_pool_last_status(self.state.pools[probe.pool_name])
 
     def _scan_state(self):
         """Iterate over the health table, request health probes"""
-        for pool_name in self._state.pools:
-            pool = self._state.pools[pool_name]
+        for pool_name in self.state.pools:
+            pool = self.state.pools[pool_name]
             for member_ip in pool.members:
                 member = pool.members[member_ip]
 
@@ -195,7 +204,7 @@ class Tracker(multiprocessing.Process):
         pool.last_status is set to pool.status and a log message is generated.
         """
         if pool.last_status != pool.status:
-            LOG.info('pool "{}" status changed to {}'.
+            LOG.info('pool status change: pool "{}" is {}'.
                      format(pool.name, state.pool.pprint_status(pool.status))) 
             pool.last_status = pool.status
 

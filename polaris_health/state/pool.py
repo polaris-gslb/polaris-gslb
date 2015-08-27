@@ -94,6 +94,9 @@ class PoolMember:
         # None = new, True = up, False = down
         self.status = None
 
+        # reason why this status has been set
+        self.status_reason = None
+
         # timestamp when the probe was issued last time
         # used to determine when to send a new probe
         self.last_probe_issued_time = None
@@ -102,12 +105,6 @@ class PoolMember:
         # probing requests to attempt before declaring the member down
         # set to the parent's pool monitor retries value initially
         self.retries_left = None
-
-    def __str__(self):
-        s = ''
-        for k in self.__dict__:
-            s += '{} {}\n'.format(k, self.__dict__[k])
-        return s
 
 class Pool:
 
@@ -391,10 +388,4 @@ class Pool:
         obj['dist_tables'] = dist_tables
 
         return obj
-
-    def __str__(self):
-        s = ''
-        for k in self.__dict__:
-            s += '{} {}\n'.format(k, self.__dict__[k])
-        return s
 
