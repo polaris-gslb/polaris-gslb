@@ -14,7 +14,7 @@ LOG.addHandler(logging.NullHandler())
 
 class State:
 
-    """Health tracker state table 
+    """Health state table 
     
     attributes:
         .pools
@@ -30,9 +30,10 @@ class State:
         """
         obj = {}
 
-        # timestamp
+        # add a timestamp
         obj['timestamp'] = time.time()
 
+        # add pools
         obj['pools'] = {}
         for pool_name in self.pools:
             # build a dist pool object only if a pool is UP or it's fallback
@@ -41,6 +42,7 @@ class State:
                     or self.pools[pool_name].fallback == 'any'):
                 obj['pools'][pool_name] = self.pools[pool_name].to_dist_dict()
 
+        # add globalnames
         obj['globalnames'] = {}
         for globalname_name in self.globalnames:
             # check if the reference pool exists (it may be absent if all 
@@ -110,15 +112,4 @@ class State:
                     GlobalName.from_config_dict(
                         name=globalname_name,
                         obj=obj['globalnames'][globalname_name])   
-
-    def __str__(self):
-        s = 'pools:\n'
-        for name in self.pools:
-            s += '{}\n{}\n'.format(name, str(self.pools[name]))
-
-        s += 'globalnames:\n'
-        for name in self.globalnames:
-            s += '{}\n{}\n'.format(name, str(self.globalnames[name]))
-
-        return s
 
