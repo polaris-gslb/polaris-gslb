@@ -148,19 +148,23 @@ class RemoteBackend:
         obj = {}
         obj['result'] = self.result
 
-        # store request and response JSON objects
+        # log request and result
         self.log.append('request: {}'.format(self.__request))
+        self.log.append('result: {}'.format(self.result))
 
-        # store PID of the process
+        # log PID of the process
         self.log.append('pid: {}'.format(os.getpid()))
 
-        # store how long it took to process the request
+        # log total time taken to process the request
         time_taken = time.time() - self._start_time
         self.log.append('time taken: {:6f}'.format(time_taken))
 
-        # response 'log' field must be an array
-        obj['log'] = self.log 
+        # pdns would log entries one at a time which can make it hard to read
+        # join log entries into a single string
+        # response 'log' field must still be an array
+        obj['log'] = [ ' '.join(self.log) ]
 
+        # send the response to pdns
         self.__writer.write(json.dumps(obj))
         self.__writer.write('\n')
         self.__writer.flush()
