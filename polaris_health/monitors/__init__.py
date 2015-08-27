@@ -5,9 +5,9 @@ import logging
 from polaris_health import Error
 
 __all__ = [ 
-           'BaseMonitor',
-           'registered'
-           ]
+    'BaseMonitor',
+    'registered'
+]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
@@ -58,19 +58,12 @@ class BaseMonitor:
     def run(self, dst_ip):
         raise NotImplementedError
 
-    def __str__(self):
-        s = '{} '.format(self.__class__.__name__)
-        for k in self.__dict__:
-            s += '{}={} '.format(k, self.__dict__[k])
-        return s
-
 from .http import HTTPStatus, HTTPSStatus
-from .tcp import TCPConnect, TCPContent
+from .tcp import TCP
 
 registered = {
     'http_status': HTTPStatus,
     'https_status': HTTPSStatus,
-    'tcp_connect': TCPConnect,
-    'tcp_content': TCPContent
+    'tcp': TCP,
 }            
 
