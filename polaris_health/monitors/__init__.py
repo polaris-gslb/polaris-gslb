@@ -58,12 +58,11 @@ class BaseMonitor:
     def run(self, dst_ip):
         raise NotImplementedError
 
-from .http import HTTPStatus, HTTPSStatus
+from .http import HTTP
 from .tcp import TCP
 
 registered = {
-    'http_status': HTTPStatus,
-    'https_status': HTTPSStatus,
+    'http': HTTP,
     'tcp': TCP,
 }            
 

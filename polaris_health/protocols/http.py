@@ -23,10 +23,14 @@ class HTTPResponse:
         r'^HTTP\/\d\.\d (\d+) ([^\r]*)\r\n', flags=re.I)
 
     def __init__(self, raw):
-        """parse raw HTTP response into components
+        """Parse a raw HTTP response into components and sets:
+
+        self.status_code:
+        self.status_reason
 
         args:
-            raw, bytes(), raw HTTP bytes received from a server
+            raw: bytes(), raw HTTP bytes received from a server
+
         """
         self.raw = raw.decode()
 
@@ -40,12 +44,14 @@ class HTTPResponse:
         # search for HTTP Status-Line in the beginning of the response
         m = self._STATUS_LINE_RE.search(self.raw[:512])
 
-        # if there is no match, non-http response?
+        # if there is no match, we got a none-http response?
         if not m:
-            raise ProtocolError('Received non-HTTP response?')
+            raise ProtocolError(
+                'Unable to find HTTP Status-Line in the response')
 
-        # convert status to integer, regexp is matching \d+,
-        # no need to trap ValueError
+        # convert status to integer
+        # as the _STATUS_LINE_RE regexp is matching \d+ 
+        # no need to trap ValueError here
         self.status_code = int(m.group(1))
         self.status_reason = m.group(2)
 
@@ -53,18 +59,19 @@ class HTTPRequest:
 
     """HTTP request"""    
 
-    def __init__(self, ip, use_ssl=False, hostname=None, path='/', 
+    def __init__(self, ip, use_ssl=False, hostname=None, url_path='/', 
                  port=None, timeout=2):
         """
         args:
             ip: string, ip address to connect to
             use_ssl: bool, whether to use SSL
             hostname: server's hostname, this will be supplied 
-                in "Host:" header, when using  SSL, this will also be
+                in "Host:" header; when using SSL, this will also be
                 supplied via SNI 
-            path: str, URL path, e.g. /index.html
+            url_path: str, URL url_path, e.g. /index.html
             port: int, port number to use, by default port 80 will be used
                 (443 if use_ssl is True)
+
         """
         ### use_ssl
         self.use_ssl = use_ssl
@@ -72,18 +79,18 @@ class HTTPRequest:
         ### ip
         self.ip = ip
 
-        # path
-        self.path = path
-        # prepend path with "/"
-        if not self.path.startswith('/'):
-            self.path = '/{}'.format(self.path)
+        # url_path
+        self.url_path = url_path
+        # prepend url_path with "/"
+        if not self.url_path.startswith('/'):
+            self.url_path = '/{}'.format(self.url_path)
 
         ### hostname
         self.hostname = hostname
 
         ### port
         self.port = port
-        # if port is not specified, use 443 with SSL on or 80 with SSL off
+        # if port is not specified, use 443 with SSL on, 80 with SSL off
         if self.port is None:
             if self.use_ssl:
                 self.port = 443
@@ -99,7 +106,7 @@ class HTTPRequest:
         return self._make(method='GET')
 
     def _make(self, method='GET'):
-        """Make HTTP(S) request
+        """Make HTTP request
 
         args:
             method: string, one of GET, POST, PUT
@@ -114,14 +121,15 @@ class HTTPRequest:
         
         # "Host:" header must be provided when using SNI
         req_str = ('{} {} HTTP/1.0\r\n{}Connection: close\r\n\r\n'.
-                   format(method, self.path, host_header))
+                   format(method, self.url_path, host_header))
 
-        # create tcp.Socket
-        tcp_sock = tcp.TCPSocket(ip=self.ip, port=self.port, timeout=self.timeout)
+        # create a socket
+        tcp_sock = tcp.TCPSocket(ip=self.ip, port=self.port,
+                                 timeout=self.timeout)
 
         # if using SSL wrap the socket
         if self.use_ssl:
-            tcp_sock.sock= UNVERIFIED_SSL_CONTEXT.wrap_socket(
+            tcp_sock.sock = UNVERIFIED_SSL_CONTEXT.wrap_socket(
                 tcp_sock.sock, server_hostname=self.hostname)
 
         # connect
