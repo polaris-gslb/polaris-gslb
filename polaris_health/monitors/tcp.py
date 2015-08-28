@@ -18,19 +18,20 @@ MAX_RESPONSE_BYTES = 512
 # maximum allowed length of match_re parameter
 MAX_MATCH_RE_LEN = 128
 
-# maximum allowed length of send parameter
-MAX_SEND_LEN = 256
+# maximum allowed length of send_string parameter
+MAX_SEND_STRING_LEN = 256
 
 class TCP(BaseMonitor):
 
     """TCP monitor base"""
 
-    def __init__(self, port, send=None, match_re=None,
+    def __init__(self, port, send_string=None, match_re=None,
                  interval=10, timeout=1, retires=2):
         """
         args:
             port: int, port number
-            send: string, a text to send, before reading response
+            send_string: string, a string to send to the socket,
+                before reading a response
             match_re: string, a regular expression to search for in a response
 
             Other args as per BaseMonitor() spec
@@ -68,23 +69,24 @@ class TCP(BaseMonitor):
                 LOG.error(log_msg)
                 raise Error(log_msg)
 
-        ### send ###
-        self.send = send
+        ### send_string ###
+        self.send_string = send_string
         self._send_bytes = None
-        if send is not None:
-            if not isinstance(send, str) or len(send) > MAX_SEND_LEN:
-                log_msg = ('send "{}" must be a string, {} chars max'.
-                       format(send, MAX_SEND_LEN))
+        if send_string is not None:
+            if not isinstance(send_string, str) \
+                    or len(send_string) > MAX_SEND_STRING_LEN:
+                log_msg = ('send_string "{}" must be a string, {} chars max'.
+                       format(send_string, MAX_SEND_STRING_LEN))
                 LOG.error(log_msg)
                 raise Error(log_msg)
 
             # convert to bytes for sending over network
-            self._send_bytes = self.send.encode()
+            self._send_bytes = self.send_string.encode()
 
     def run(self, dst_ip):
         """
         Connect a tcp socket 
-        If we have a text to send, send it to the socket
+        If we have a string to send, send it to the socket
         If have a regexp to match, read response and match the regexp
 
         args:
@@ -100,10 +102,10 @@ class TCP(BaseMonitor):
         """
         tcp_sock = TCPSocket(ip=dst_ip, port=self.port, timeout=self.timeout)
 
-        # connect socket, send text if required
+        # connect socket, send string if required
         try:
             tcp_sock.connect()
-            if self.send is not None:
+            if self.send_string is not None:
                 tcp_sock.sendall(self._send_bytes)
         except ProtocolError as e:
             raise MonitorFailed(e)
