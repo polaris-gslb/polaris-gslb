@@ -33,7 +33,7 @@ class HTTP(BaseMonitor):
             Other args as per BaseMonitor() spec
 
         """
-        super(HTTPBase, self).__init__(interval=interval, timeout=timeout,
+        super(HTTP, self).__init__(interval=interval, timeout=timeout,
                                          retries=retires)
         
         ### use_ssl ###
