@@ -36,20 +36,13 @@ class State:
         # add pools
         obj['pools'] = {}
         for pool_name in self.pools:
-            # build a dist pool object only if a pool is UP or it's fallback
-            # is set to "any"
-            if (self.pools[pool_name].status 
-                    or self.pools[pool_name].fallback == 'any'):
-                obj['pools'][pool_name] = self.pools[pool_name].to_dist_dict()
+            obj['pools'][pool_name] = self.pools[pool_name].to_dist_dict()
 
         # add globalnames
         obj['globalnames'] = {}
         for globalname_name in self.globalnames:
-            # check if the reference pool exists (it may be absent if all 
-            # members are DOWN and fallback is set to 'refuse')
-            if self.globalnames[globalname_name].pool_name in obj['pools']:
-                obj['globalnames'][globalname_name] = \
-                    self.globalnames[globalname_name].to_dist_dict()
+            obj['globalnames'][globalname_name] = \
+                self.globalnames[globalname_name].to_dist_dict()
 
         return obj
 

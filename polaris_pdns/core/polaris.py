@@ -12,7 +12,7 @@ from .remotebackend import RemoteBackend
 
 __all__ = [ 'Polaris' ]
 
-# minimum time in seconds between distribution state sync from shared mem 
+# minimum number of seconds between syncing distribution state from shared mem 
 STATE_SYNC_INTERVAL = 1
 
 class Polaris(RemoteBackend):
@@ -35,11 +35,11 @@ class Polaris(RemoteBackend):
 
         # used to determine whether we need to set self._state
         # to the state we pull from shared memory(every STATE_SYNC_INTERVAL)
-        # initialize with a value as it will be used for comparison
+        # initialize with 0 as it will be used for comparison
         # in self._sync_state on it's first run
         self._state_timestamp = 0
 
-        # timestap when the state was last synced from shared memory
+        # time when the state was last synced from shared memory
         # init with 0 for comparison in _sync_state() to work 
         self._state_last_synced = 0
 
@@ -51,8 +51,9 @@ class Polaris(RemoteBackend):
         # sync state from shared memory
         self._sync_state()
 
+        # REFUSE queries for globalnames we don't have
         # respond with False if there is no globalname corresponding
-        # to the qname, this will result in REFUSED at the front-end
+        # to the qname, this will result in REFUSED in the front-end
         if params['qname'].lower() not in self._state['globalnames']:
             self.log.append(
                 'no globalname found for qname "{}"'.format(params['qname']))
@@ -77,47 +78,84 @@ class Polaris(RemoteBackend):
         self.result =  [ 'NO' ]
 
     def _any_response(self, params):
-        """Generate a response to ANY/A query"""
+        """Generate a response to ANY/A query
 
+        See polaris_health.state to_dist_dict() methods for the distribution
+        state implementation details.
+
+        """
         qname = params['qname'].lower()
 
         # get pool associated with the qname
         pool_name = self._state['globalnames'][qname]['pool_name']
         pool = self._state['pools'][pool_name]
        
-        # if using a topology based method, get client's region
-        # get_region() will return None if the region cannot be determined
-        if pool['lb_method'] == 'twrr':
-            t = time.time()
-            region = topology.get_region(params['remote'], 
-                                         polaris_pdns.config.TOPOLOGY_MAP)
-            self.log.append('client region: {}'.format(region))
-            self.log.append(
-                'get_region() time taken: {:.6f}'.format(time.time() - t))
-
-        # determine which dist table to use
-        # use _default table by default
+        # use _default tdistribution table by default
         dist_table = pool['dist_tables']['_default']
 
-        # if using a topology method, have a region table corresponding to 
-        # the client's region and it's not empty, use it
-        if pool['lb_method'] == 'twrr':
-            if region in pool['dist_tables'] and \
-                    pool['dist_tables'][region]['rotation']:
-                dist_table = pool['dist_tables'][region]
+        ### pool is UP ###
+        if pool['status']:
+            # if using a topology based method, check if we have a distribution
+            # table in the same region, if so - use it
+            if pool['lb_method'] == 'twrr':
 
-        # expose distribution table used in the log
-        self.log.append('dist table used: {}'.format(json.dumps(dist_table)))
+                # we'll log the time it takes to perfom the topology lookup
+                t = time.time()
 
-        # determine how many records to return, which is
-        # the minimum of the dist table's num_unique_addrs and 
+                # lookup the client's region, get_region() will
+                # return None if the region cannot be determined
+                region = topology.get_region(params['remote'], 
+                                             polaris_pdns.config.TOPOLOGY_MAP)
+
+                # log the time taken to perform the lookup
+                self.log.append(
+                    'get_region() time taken: {:.6f}'.format(time.time() - t))
+
+                # log client's region
+                self.log.append('client region: {}'.format(region))
+
+                # if we have a region table corresponding 
+                # to the client's region - use it
+                if region in pool['dist_tables']:
+                    dist_table = pool['dist_tables'][region]
+
+        ### pool is DOWN ###
+        else:
+
+            # use the default distribution table
+            if pool['fallback'] == 'any':
+                pass
+
+            # return empty RR-set
+            elif pool['fallback'] == 'nodata':
+                self.result = []
+                return
+
+            # refuse query
+            elif pool['fallback'] == 'refuse':
+                self.result = False
+                return
+
+        # log the distribution table used
+        self.log.append('dist table used: {}'
+                        .format(json.dumps(dist_table)))
+
+        # determine how many records to return
+        # which is the minimum of the dist table's num_unique_addrs and 
         # the pool's max_addrs_returned
         if dist_table['num_unique_addrs'] <= pool['max_addrs_returned']: 
             num_records_return = dist_table['num_unique_addrs']
         else:    
             num_records_return = pool['max_addrs_returned']
 
-        # add records to the response    
+        # if we don't have anything to return(all members have the weight of 0)
+        # set the self.result to empty list and return
+        # this will result in an empty RR-set response
+        if num_records_return == 0:
+            self.result = []
+            return
+
+        ### add records to the response ###
         for i in range(num_records_return):
             # add record to the response
             self.add_record(qtype='A',
