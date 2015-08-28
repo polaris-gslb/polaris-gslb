@@ -49,7 +49,7 @@ class TCP(BaseMonitor):
             raise Error(log_msg)
 
         ### match_re ###
-        self.match_re = match
+        self.match_re = match_re
         self._match_re_compiled = None
         if self.match_re is not None:
             if not isinstance(match_re, str) \
