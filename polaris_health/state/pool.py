@@ -295,8 +295,8 @@ class Pool:
 
         "_default" distribution table is always built.
 
-        If a topology-based lb method is used, also build regional 
-        distribution tables.
+        Region-specific distribution tables are only built if the pool is using 
+        a topology lb method and has an UP member.
 
         Example:
             {
