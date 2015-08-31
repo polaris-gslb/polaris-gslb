@@ -47,11 +47,11 @@ class Polaris(RemoteBackend):
         """
         args:
             params: 'parameters' dict from PowerDNS JSON API request
+        
         """
-        # sync state from shared memory
+        # sync(if required) state from the shared memory
         self._sync_state()
 
-        # REFUSE queries for globalnames we don't have
         # respond with False if there is no globalname corresponding
         # to the qname, this will result in REFUSED in the front-end
         if params['qname'].lower() not in self._state['globalnames']:
@@ -60,21 +60,22 @@ class Polaris(RemoteBackend):
             self.result = False
             return
 
-        # SOA response
-        if params['qtype'] == 'SOA':
-            self._soa_response(params)
-            return
-
         # ANY/A response
         if params['qtype'] == 'ANY' or params['qtype'] == 'A':
             self._any_response(params)
             return
 
-        # drop otherwise
+        # SOA response
+        if params['qtype'] == 'SOA':
+            self._soa_response(params)
+            return
+
+        # REFUSE otherwise
         self.result = False
 
     def do_getDomainMetadata(self, params):
         """Always respond with {"result": ["NO"]}"""
+
         self.result =  [ 'NO' ]
 
     def _any_response(self, params):
@@ -86,20 +87,22 @@ class Polaris(RemoteBackend):
         """
         qname = params['qname'].lower()
 
-        # get pool associated with the qname
+        # get a pool associated with the qname
         pool_name = self._state['globalnames'][qname]['pool_name']
         pool = self._state['pools'][pool_name]
        
-        # use _default tdistribution table by default
+        # use the _default distribution table by default
         dist_table = pool['dist_tables']['_default']
 
+        ##################
         ### pool is UP ###
+        ##################
         if pool['status']:
             # if using a topology based method, check if we have a distribution
             # table in the same region, if so - use it
             if pool['lb_method'] == 'twrr':
 
-                # we'll log the time it takes to perfom the topology lookup
+                # we'll log the time it takes to perfom a topology lookup
                 t = time.time()
 
                 # lookup the client's region, get_region() will
@@ -119,10 +122,11 @@ class Polaris(RemoteBackend):
                 if region in pool['dist_tables']:
                     dist_table = pool['dist_tables'][region]
 
+        ####################
         ### pool is DOWN ###
+        ####################
         else:
-
-            # use the default distribution table
+            # use the _default distribution table
             if pool['fallback'] == 'any':
                 pass
 
@@ -131,7 +135,7 @@ class Polaris(RemoteBackend):
                 self.result = []
                 return
 
-            # refuse query
+            # refuse query(SOA response must return False as well)
             elif pool['fallback'] == 'refuse':
                 self.result = False
                 return
@@ -164,14 +168,23 @@ class Polaris(RemoteBackend):
                             content=dist_table['rotation'][dist_table['index']],
                             ttl=self._state['globalnames'][qname]['ttl'])    
 
-            # increase index, set it to 0 if we reached 
-            # the end of the rotation list
+            # increase index
             dist_table['index'] += 1
+            # set the index to 0 if we reached the end of the rotation list
             if dist_table['index'] >= len(dist_table['rotation']):
                 dist_table['index'] = 0
 
     def _soa_response(self, params):
-        """Generate a response to SOA query"""
+        """Generate a response to a SOA query"""
+
+        # if pool is DOWN and fallback is set to "refuse", refuse SOA queries
+        # when both SOA any ANY results in False the pdns will produce a REFUSE
+        qname = params['qname'].lower()
+        pool_name = self._state['globalnames'][qname]['pool_name']
+        pool = self._state['pools'][pool_name]
+        if not pool['status'] and pool['fallback'] == 'refuse':
+                self.result = False
+                return
 
         # append ns with a dot here
         ns = '{}.'.format(polaris_pdns.config.BASE['HOSTNAME'])
@@ -192,9 +205,11 @@ class Polaris(RemoteBackend):
                         ttl=60)
 
     def _sync_state(self):
-        """Synchronize local distribution state from shared memory"""
+        """Synchronize the local distribution state from shared memory
 
+        """
         t = time.time()
+
         # do not sync state if STATE_SYNC_INTERVAL seconds haven't passed
         # since the last sync
         if t - self._state_last_synced < STATE_SYNC_INTERVAL:

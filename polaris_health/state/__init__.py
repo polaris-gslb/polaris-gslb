@@ -25,8 +25,9 @@ class State:
         self._from_config_dict(config_obj)
 
     def to_dist_dict(self):
-        """Return dict representation of the State required to perform 
-        distribution.
+        """Return a dict representation of self required by Polaris PDNS
+        to perform query distribution.
+
         """
         obj = {}
 
@@ -51,6 +52,7 @@ class State:
 
         args:
             obj: dict, config dict(lb_config)
+
         """
         # build pools 
         self.pools = {}
@@ -86,7 +88,7 @@ class State:
                     LOG.Error(log_msg)
                     raise Error(log_msg)    
 
-                # check if referenced pool exists
+                # check if the referenced pool exists
                 if 'pool' not in obj['globalnames'][globalname_name]:
                     log_msg = ('"{}" is missing a mandatory parameter "pool"'
                                .format(globalname_name))
