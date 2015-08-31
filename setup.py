@@ -62,3 +62,6 @@ copy('{}/bin/polaris-pdns'.format(PWD),
 copy('{}/bin/check-polaris-health'.format(PWD),
      '{}/bin'.format(INSTALL_PREFIX))
 
+copy('{}/bin/check-pdns'.format(PWD),
+          '{}/bin'.format(INSTALL_PREFIX))
+
