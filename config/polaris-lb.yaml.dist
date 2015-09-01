@@ -2,29 +2,30 @@
 # Example load balancing configuration
 #
 pools:
-    polaris:
-        monitor: http_status
+    www-example:
+        monitor: http
         monitor_params:
-            path: /health-check.html
-        lb_method: wrr 
+            use_ssl: true
+            hostname: www.example.com
+            url_path: /health-check.html
+        lb_method: twrr 
         fallback: any
         max_addrs_returned: 2
         members:
-            192.168.1.2:
+            10.1.1.2:
                 name: www1-dc1
                 weight: 1
-            192.168.1.3:
+            10.1.1.3:
                 name: www2-dc1
                 weight: 1
-            192.168.1.4:
+            192.168.1.2:
                 name: www3-dc2
                 weight: 1
-            192.168.1.5:
+            192.168.1.3:
                 name: www4-dc2
                 weight: 1
 
 globalnames:
-    polaris.example.com:
-        pool: polaris
+    www.example.com:
+        pool: www-example
         ttl: 1
-
