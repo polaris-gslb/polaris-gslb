@@ -6,6 +6,8 @@ import json
 import time
 import logging
 
+import polaris_pdns.config
+
 __all__ = [ 'RemoteBackend' ]
 
 class RemoteBackend:
@@ -144,6 +146,7 @@ class RemoteBackend:
 
         You can optionally add 'log' array, each line in this array will be 
         logged in PowerDNS."
+
         """
         obj = {}
         obj['result'] = self.result
@@ -159,10 +162,13 @@ class RemoteBackend:
         time_taken = time.time() - self._start_time
         self.log.append('time taken: {:6f}'.format(time_taken))
 
-        # pdns would log entries one at a time which can make it hard to read
-        # join log entries into a single string
-        # response 'log' field must still be an array
-        obj['log'] = [ ' '.join(self.log) ]
+        # send log to pdns
+        if polaris_pdns.config.BASE['LOG']:
+            # pdns would log entries one at a time
+            # which can make it hard to read
+            # join log entries into a single string
+            # response 'log' field must still be an array
+            obj['log'] = [ ' '.join(self.log) ]
 
         # send the response to pdns
         self.__writer.write(json.dumps(obj))

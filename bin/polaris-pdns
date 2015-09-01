@@ -27,14 +27,15 @@ else:
 base_config_file = '{}/etc/polaris-pdns.yaml'.format(INSTALL_PREFIX)
 if os.path.isfile(base_config_file):
     with open(base_config_file) as fp:
-        _base = yaml.load(fp)
+        base_config = yaml.load(fp)
 
-    # validate and set values
-    for k in _base:
-        if k not in polaris_pdns.config.BASE:
-            raise Exception('unknown configuration option "{}"'.format(k))
-        else:
-            polaris_pdns.config.BASE[k] = _base[k]
+    if base_config:
+        # validate and set values
+        for k in base_config:
+            if k not in polaris_pdns.config.BASE:
+                raise Exception('unknown configuration option "{}"'.format(k))
+            else:
+                polaris_pdns.config.BASE[k] = base_config[k]
 
 # load TOPOLOGY_MAP configuration
 topology_config_file = '{}/etc/polaris-topology.yaml'.format(INSTALL_PREFIX)
@@ -42,8 +43,9 @@ if os.path.isfile(topology_config_file):
     with open(topology_config_file) as fp:
         topology_config = yaml.load(fp)
 
-    polaris_pdns.config.TOPOLOGY_MAP = \
-        topology.config_to_map(topology_config)
+    if topology_config:
+        polaris_pdns.config.TOPOLOGY_MAP = \
+            topology.config_to_map(topology_config)
 
 # start the remote backend
 polaris_pdns.main()

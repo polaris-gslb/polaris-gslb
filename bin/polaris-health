@@ -52,14 +52,16 @@ def main():
     base_config_file = '{}/etc/polaris-health.yaml'.format(INSTALL_PREFIX)
     if os.path.isfile(base_config_file):
         with open(base_config_file) as fp:
-            _base = yaml.load(fp)
+            base_config = yaml.load(fp)
 
-        # validate and set values
-        for k in _base:
-            if k not in polaris_health.config.BASE:
-                raise Exception('unknown configuration option "{}"'.format(k))
-            else:
-                polaris_health.config.BASE[k] = _base[k]
+        if base_config:
+            # validate and set values
+            for k in base_config:
+                if k not in polaris_health.config.BASE:
+                    raise Exception('unknown configuration option "{}"'
+                                    .format(k))
+                else:
+                    polaris_health.config.BASE[k] = base_config[k]
 
     # load LB configuration
     lb_config_file = '{}/etc/polaris-lb.yaml'.format(INSTALL_PREFIX)
@@ -75,8 +77,9 @@ def main():
         with open(topology_config_file) as fp:
             topology_config = yaml.load(fp)
 
-        polaris_health.config.TOPOLOGY_MAP = \
-            topology.config_to_map(topology_config)
+        if topology_config:
+            polaris_health.config.TOPOLOGY_MAP = \
+                topology.config_to_map(topology_config)
 
     # perform an action
     if opts.action == 'start':
