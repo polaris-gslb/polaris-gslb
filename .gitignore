@@ -4,7 +4,6 @@ build
 dist
 *egg-info
 *.swp
-auth.py
+*.swo
 .DS_Store
-log/
 
