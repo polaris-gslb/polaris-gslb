@@ -7,7 +7,7 @@ pools:
         monitor_params:
             use_ssl: true
             hostname: www.example.com
-            url_path: /health-check.html
+            url_path: /healthcheck?check_all=true
         lb_method: twrr 
         fallback: any
         max_addrs_returned: 2
