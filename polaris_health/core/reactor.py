@@ -69,7 +69,7 @@ def sig_handler(signo, stack_frame):
         else:
             return
 
-    # if we got here, some processes may still be alive, SIGKILL those
+    # if we got here, some processes may still be alive, SIGKILL them
     LOG.error('Some processes may still be alive after all '
               'termination attempts, SIGKILL-ing those')
     for p in PROCESSES:
@@ -146,8 +146,9 @@ class Reactor:
         LOG.info('Polaris health finished execution')
 
     def _heartbeat_loop(self):
-        """Periodically log various application internal stats
-        to a shared memory
+        """Periodically log various internal application stats
+        to the shared memory.
+
         """
         # set last time so that "if t_now - t_last >= HEARTBEAT_LOG_INTERVAL"
         # below evalutes to True on the first run
@@ -178,7 +179,7 @@ class Reactor:
                 # push to shared mem
                 self._sm.set(config.BASE['SHARED_MEM_HEARTBEAT_KEY'],
                              json.dumps(obj), HEARTBEAT_TTL)
-                LOG.debug('pushed heartbeat to shared mem')
+                LOG.debug('pushed a heartbeat to the shared memory')
 
                 t_last = t_now
 
