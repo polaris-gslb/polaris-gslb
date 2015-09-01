@@ -129,5 +129,5 @@ class TCP(BaseMonitor):
             
             # match regexp
             if not self._match_re_compiled.search(response_text):
-                raise MonitorFailed('failed to match the regexp')
+                raise MonitorFailed('failed to match the reg exp')
 
