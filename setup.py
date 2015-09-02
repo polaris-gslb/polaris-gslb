@@ -1,3 +1,7 @@
+#-*- coding: utf-8 -*-
+
+"""Polaris setup script"""
+
 import os
 import sys
 import inspect
@@ -7,19 +11,16 @@ from setuptools import setup, find_packages
 
 INSTALL_PREFIX = '/opt/polaris'
 
-# determine directory where setup.py is located
+# determine the directory where setup.py is located
 PWD = os.path.abspath(
-    os.path.split(inspect.getfile( inspect.currentframe( ) ))[0])
-
-# load version
-sys.path.insert(0, PWD)
-from version import version
+    os.path.split(inspect.getfile(inspect.currentframe()))[0])
 
 setup (
-    version=version,
+    version='0.3.0',
     author='Anton Gavrik',    
-    name='polaris',
-    description='DNS-based traffic manager(GSLB)',
+    name='polaris-gslb',
+    description=('A simple, extendable Global Server Load Balancing(GSLB) '
+                 'solution, DNS-based traffic manager.'),
     packages = find_packages('.'),
     install_requires=[
         'pyyaml',
