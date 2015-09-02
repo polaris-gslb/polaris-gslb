@@ -32,7 +32,6 @@ setup (
 for path in [ 
         '{}/etc'.format(INSTALL_PREFIX),
         '{}/bin'.format(INSTALL_PREFIX),
-        '{}/run'.format(INSTALL_PREFIX)
         ]:
     try:
         os.makedirs(path)
