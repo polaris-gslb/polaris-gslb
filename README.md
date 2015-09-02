@@ -2,7 +2,7 @@
 
 A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic manager.
 
-* Built as an enhancement to [PowerDNS Authoritative Server](https://www.powerdns.com/auth.html)
+* Built as an enhancement for [PowerDNS Authoritative Server](https://www.powerdns.com/auth.html)
 * Features:
  * Load-balancing methods:
    * Weighted round-robin
