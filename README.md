@@ -10,7 +10,7 @@ A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traf
     * TCP
     * HTTP
 * Up to 32 addresses returned in a response
-* Different ways to handle all-pool-members-DOWN situation(fallback): REFUSE, answer with NOERROR and an empty data set or any configured end-points.
+* Different ways to handle all-pool-members-DOWN situation(fallback): REFUSE, answer with NOERROR and no data in the asnwer section or any configured end-points.
 
 See the [WIKI](https://github.com/polaris-gslb/polaris-core/wiki) for installation, configuration and other information.
 
