@@ -189,10 +189,13 @@ class Pool:
 
         Read-only property based on health status of the pool members.
 
-        Return True is any member of the pool is UP, False otherwise.
+        Return True is any member with non-0 weight of the pool is UP, 
+        False otherwise.
+
         """
         for member_ip in self.members:
-            if self.members[member_ip].status:
+            if self.members[member_ip].weight > 0 \
+                    and self.members[member_ip].status:
                 return True
 
         return False
