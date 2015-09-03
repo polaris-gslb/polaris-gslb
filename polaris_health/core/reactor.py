@@ -19,9 +19,6 @@ __all__ = [ 'Reactor' ]
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
-# location of the pid file
-PID_FILE = '/run/polaris-health.pid'
-
 # how often in seconds to run the heartbeat loop
 HEARTBEAT_LOOP_INTERVAL = 0.5
 # how often in seconds to log heartbeat into shared mem
@@ -123,12 +120,12 @@ class Reactor:
         # trap the signal to terminate upon
         signal.signal(signal.SIGTERM, sig_handler)
 
-        PID_FILE = '/run/polaris-health.pid'
+        pid_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'run', 'polaris-health.pid')
 
         # write pid file
-        LOG.debug('writting {}'.format(PID_FILE))    
-        with open(PID_FILE, 'w') \
-                as fh:
+        LOG.debug('writting {}'.format(pid_file))    
+        with open(pid_file, 'w') as fh:
             fh.write(str(os.getpid()))
 
         # run the heartbeat loop
@@ -140,8 +137,8 @@ class Reactor:
             p.join()
 
         # remove the pid file
-        LOG.debug('removing {}'.format(PID_FILE))
-        os.remove(PID_FILE)
+        LOG.debug('removing {}'.format(pid_file))
+        os.remove(pid_file)
 
         LOG.info('Polaris health finished execution')
 

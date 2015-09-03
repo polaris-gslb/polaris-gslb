@@ -7,7 +7,7 @@ import memcache
 
 from polaris_health.util import topology
 
-import polaris_pdns.config
+from polaris_pdns import config
 from .remotebackend import RemoteBackend
 
 __all__ = [ 'Polaris' ]
@@ -28,7 +28,7 @@ class Polaris(RemoteBackend):
 
         # shared memory client
         self._sm = memcache.Client(
-            [polaris_pdns.config.BASE['SHARED_MEM_HOSTNAME']])   
+            [config.BASE['SHARED_MEM_HOSTNAME']])   
        
         # this will hold the distribution state
         self._state = {}
@@ -74,9 +74,11 @@ class Polaris(RemoteBackend):
         self.result = False
 
     def do_getDomainMetadata(self, params):
-        """Always respond with {"result": ["NO"]}"""
+        """PDNS seems to ask for this quite a bit,
+        respond with result:false
 
-        self.result =  [ 'NO' ]
+        """
+        self.result = False
 
     def _any_response(self, params):
         """Generate a response to ANY/A query
@@ -108,7 +110,7 @@ class Polaris(RemoteBackend):
                 # lookup the client's region, get_region() will
                 # return None if the region cannot be determined
                 region = topology.get_region(params['remote'], 
-                                             polaris_pdns.config.TOPOLOGY_MAP)
+                                             config.TOPOLOGY_MAP)
 
                 # log the time taken to perform the lookup
                 self.log.append(
@@ -187,7 +189,7 @@ class Polaris(RemoteBackend):
                 return
 
         # append ns with a dot here
-        ns = '{}.'.format(polaris_pdns.config.BASE['HOSTNAME'])
+        ns = '{}.'.format(config.BASE['HOSTNAME'])
         contact = 'hostmaster.{}'.format(ns)                  
         content = ('{ns} {contact} {serial} {retry} {expire} {min_ttl}'.
                    format(ns=ns,
@@ -216,8 +218,7 @@ class Polaris(RemoteBackend):
             return
 
         # get the distribution state object from shared memory
-        sm_state = self._sm.get(
-            polaris_pdns.config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
+        sm_state = self._sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
 
         # check timestamp on it, if it did not change since the last pull
         # do not update the local memory state to avoid resetting

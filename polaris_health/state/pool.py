@@ -4,9 +4,8 @@ import logging
 import ipaddress
 import random
 
-import polaris_health.config
+from polaris_health import Error, config, monitors
 from polaris_health.util import topology
-from polaris_health import Error, monitors
 
 __all__ = [ 'PoolMember', 'Pool' ]
 
@@ -253,7 +252,7 @@ class Pool:
             # set region on the pool member
             if lb_method == 'twrr':
                 region = topology.get_region(
-                    member_ip, polaris_health.config.TOPOLOGY_MAP)
+                    member_ip, config.TOPOLOGY_MAP)
                 if not region:
                     log_msg  = ('Unable to determine region for pool '
                                 '{0} member {1}({2})'.
