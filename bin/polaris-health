@@ -17,7 +17,11 @@ import polaris_health
 from polaris_health import config
 from polaris_health.util import topology, log
 
-# maximum seconds to wait for the pid file to be deleted
+# maximum number of seconds to wait for the pid file to be created
+# after starting the health tracker in daemon mode
+START_TIMEOUT = 5
+
+# maximum number of seconds to wait for the pid file to be deleted
 # after stopping the health tracker
 RESTART_TIMEOUT = 10
 
@@ -132,8 +136,21 @@ def start(debug=False):
         with daemon.DaemonContext():
             polaris_health.main()
 
-        # exit the main thread
-        exit()
+        # wait until the pid file has been created
+        remaining_timeout = START_TIMEOUT
+        while remaining_timeout > 0:
+            if not os.path.isfile(PID_FILE):
+                time.sleep(0.5)
+                remaining_timeout -= 0.5
+                continue
+            else:
+                # exit the main thread
+                exit()
+
+        # pid file hasn't been created within START_TIMEOUT
+        raise Exception('Timeout waiting for {} to be created, '
+                        'Polaris health could not start?'
+                        .format(PID_FILE))
 
 def stop():
     """Stop the health tracker"""
@@ -166,8 +183,8 @@ def restart(debug=False):
     remaining_timeout = RESTART_TIMEOUT - 1
     while remaining_timeout > 0:
         if os.path.isfile(PID_FILE):
-            remaining_timeout -= 0.5
             time.sleep(0.5)
+            remaining_timeout -= 0.5
             continue
         else:
             start()
