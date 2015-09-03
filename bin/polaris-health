@@ -5,22 +5,17 @@
 
 import argparse
 import os
-import errno
-import signal
-import time
 import inspect
 import re
-import logging
+import signal
+import time
 
 import yaml
 import daemon
 
 import polaris_health
-import polaris_health.config
-import polaris_health.util.logging
-from polaris_health.util import topology
-
-PID_FILE = '/run/polaris-health.pid'
+from polaris_health import config
+from polaris_health.util import topology, log
 
 # maximum seconds to wait for the pid file to be deleted
 # after stopping the health tracker
@@ -34,6 +29,11 @@ if m:
    INSTALL_PREFIX  = m.group(1)
 else:
     raise Exception('Cannot determine the installation directory prefix')
+
+# set the configuration INSTALL_PREFIX
+config.BASE['INSTALL_PREFIX'] = INSTALL_PREFIX
+
+PID_FILE = os.path.join(INSTALL_PREFIX, 'run', 'polaris-health.pid')
 
 def main():
     # get command line arguments
@@ -49,7 +49,8 @@ def main():
     opts = parser.parse_args()
 
     # load BASE configuration
-    base_config_file = '{}/etc/polaris-health.yaml'.format(INSTALL_PREFIX)
+    base_config_file = os.path.join(
+        INSTALL_PREFIX, 'etc', 'polaris-health.yaml')
     if os.path.isfile(base_config_file):
         with open(base_config_file) as fp:
             base_config = yaml.load(fp)
@@ -57,28 +58,30 @@ def main():
         if base_config:
             # validate and set values
             for k in base_config:
-                if k not in polaris_health.config.BASE:
+                if k not in config.BASE:
                     raise Exception('unknown configuration option "{}"'
                                     .format(k))
                 else:
-                    polaris_health.config.BASE[k] = base_config[k]
+                    config.BASE[k] = base_config[k]
 
     # load LB configuration
-    lb_config_file = '{}/etc/polaris-lb.yaml'.format(INSTALL_PREFIX)
+    lb_config_file = os.path.join(
+        INSTALL_PREFIX, 'etc', 'polaris-lb.yaml')
     if not os.path.isfile(lb_config_file):
         raise Exception('{} does not exist'.format(lb_config_file))
     else:
         with open(lb_config_file) as fp:
-            polaris_health.config.LB = yaml.load(fp)
+            config.LB = yaml.load(fp)
 
     # load TOPOLOGY_MAP configuration
-    topology_config_file = '{}/etc/polaris-topology.yaml'.format(INSTALL_PREFIX)
+    topology_config_file = os.path.join(
+        INSTALL_PREFIX, 'etc', 'polaris-topology.yaml')
     if os.path.isfile(topology_config_file):
         with open(topology_config_file) as fp:
             topology_config = yaml.load(fp)
 
         if topology_config:
-            polaris_health.config.TOPOLOGY_MAP = \
+            config.TOPOLOGY_MAP = \
                 topology.config_to_map(topology_config)
 
     # perform an action
@@ -116,14 +119,14 @@ def start(debug=False):
     # debug foreground mode
     if debug:
         # setup debug logging(console)
-        polaris_health.util.logging.setup_debug()
+        log.setup_debug()
         # run health tracker in the foreground    
         polaris_health.main()
 
     # normal daemon mode
     else:
         # setup logging    
-        polaris_health.util.logging.setup()
+        log.setup()
 
         # run health tracker as a daemon
         with daemon.DaemonContext():
@@ -170,7 +173,7 @@ def restart(debug=False):
             start()
 
     # pid file hasn't been deleted within RESTART_TIMEOUT    
-    raise Exception('Timeout waiting for {} to be deleted'
+    raise Exception('Timeout waiting for {} to be removed'
                     .format(PID_FILE))
 
 if __name__ == '__main__':

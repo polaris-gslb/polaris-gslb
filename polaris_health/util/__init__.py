@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 def instance_to_dict(obj):
-    """Convert a class instance into a dict
+    """Recursively convert a class instance into a dict
     
     args:
         obj: a class instance

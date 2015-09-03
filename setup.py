@@ -1,15 +1,15 @@
 #-*- coding: utf-8 -*-
 
-"""Polaris setup script"""
+"""Polaris setup"""
 
 import os
 import sys
 import inspect
-from shutil import copy
+import shutil
 
 from setuptools import setup, find_packages
 
-INSTALL_PREFIX = '/opt/polaris'
+INSTALL_PREFIX = os.path.join('/opt', 'polaris')
 
 # determine the directory where setup.py is located
 PWD = os.path.abspath(
@@ -29,39 +29,28 @@ setup (
     ]
 )
 
-# create directories
+# create directory topology
 for path in [ 
-        '{}/etc'.format(INSTALL_PREFIX),
-        '{}/bin'.format(INSTALL_PREFIX),
+        os.path.join(INSTALL_PREFIX, 'etc'),
+        os.path.join(INSTALL_PREFIX, 'bin'),
+        os.path.join(INSTALL_PREFIX, 'run'),        
         ]:
     try:
         os.makedirs(path)
     except FileExistsError:
         continue
 
-# copy configuration files
-copy('{}/config/polaris-health.yaml.dist'.format(PWD), 
-     '{}/etc'.format(INSTALL_PREFIX))
+def copy_files(src_dir, dst_dir):
+    """Copy all files from src_dir to dst_dir""" 
+    src_files = os.listdir(src_dir)
+    for file_name in src_files:
+        full_file_name = os.path.join(src_dir, file_name)
+        if (os.path.isfile(full_file_name)):
+            shutil.copy(full_file_name, dst_dir)
 
-copy('{}/config/polaris-lb.yaml.dist'.format(PWD), 
-     '{}/etc'.format(INSTALL_PREFIX))
+# copy etc/
+copy_files(os.path.join(PWD, 'etc'), os.path.join(INSTALL_PREFIX, 'etc'))
 
-copy('{}/config/polaris-topology.yaml.dist'.format(PWD), 
-     '{}/etc'.format(INSTALL_PREFIX))
-
-copy('{}/config/polaris-pdns.yaml.dist'.format(PWD), 
-     '{}/etc'.format(INSTALL_PREFIX))
-
-# copy executables
-copy('{}/bin/polaris-health'.format(PWD),
-     '{}/bin'.format(INSTALL_PREFIX))
-
-copy('{}/bin/polaris-pdns'.format(PWD),
-     '{}/bin'.format(INSTALL_PREFIX))
-
-copy('{}/bin/check-polaris-health'.format(PWD),
-     '{}/bin'.format(INSTALL_PREFIX))
-
-copy('{}/bin/check-pdns'.format(PWD),
-          '{}/bin'.format(INSTALL_PREFIX))
+# copy bin/
+copy_files(os.path.join(PWD, 'bin'), os.path.join(INSTALL_PREFIX, 'bin'))
 

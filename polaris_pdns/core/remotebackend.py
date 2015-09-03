@@ -4,9 +4,8 @@ import sys
 import os
 import json
 import time
-import logging
 
-import polaris_pdns.config
+from polaris_pdns import config
 
 __all__ = [ 'RemoteBackend' ]
 
@@ -50,6 +49,7 @@ class RemoteBackend:
             qname: string, e.g. "host1.test.com"
             content: string, e.g. "192.168.1.1"
             ttl: string or int, e.g.: 1
+
         """
         # self.result is False by default, make it a list
         if not isinstance(self.result, list):
@@ -76,8 +76,9 @@ class RemoteBackend:
     ### private interface ###
     #########################
     def __main_loop(self):
-        """Main program loop, reads JSON requests from stdin,
+        """The main program loop, reads JSON requests from stdin,
         writes JSON responses to stdout
+
         """
         while(True):
             # reset result and log
@@ -98,7 +99,7 @@ class RemoteBackend:
             try:
                 obj = json.loads(self.__request)
             except ValueError:
-                self.log.append('ERROR cannot parse input "{}"'
+                self.log.append('error: cannot parse input "{}"'
                                 .format(self.__request))
                 self.__write_response()
                 return
@@ -111,7 +112,7 @@ class RemoteBackend:
                 method = getattr(self, method_name)
             except AttributeError:
                 self.result = False
-                self.log.append('method "{}" is not implemented'
+                self.log.append('warning: method "{}" is not implemented'
                                 .format(method_name, self.__request))
                 self.__write_response()
                 continue
@@ -126,7 +127,7 @@ class RemoteBackend:
                 method(obj['parameters'])      
             except Exception:
                 self.result = False
-                self.log.append('method "{}" failed to execute'
+                self.log.append('error: method "{}" failed to execute'
                                 .format(method_name, self.__request))
                 self.__write_response()
                 continue
@@ -136,9 +137,9 @@ class RemoteBackend:
 
     def __write_response(self):
         """Construct a response object from
-        self.result and self.log and write the response to writer.
+        self.result and self.log and write it to the writer.
 
-        The object must comform to PowerDNS JSON API spec:
+        The object must comform to the PowerDNS JSON API spec:
 
         "You must always reply with JSON hash with at least one key, 'result'. 
         This must be boolean false if the query failed. Otherwise it must
@@ -163,7 +164,7 @@ class RemoteBackend:
         self.log.append('time taken: {:6f}'.format(time_taken))
 
         # send log to pdns
-        if polaris_pdns.config.BASE['LOG']:
+        if config.BASE['LOG']:
             # pdns would log entries one at a time
             # which can make it hard to read
             # join log entries into a single string
