@@ -80,15 +80,15 @@ class Tracker(multiprocessing.Process):
                 # if the state changed, push it to the shared memory
                 if self.state_changed:
 
-                    # push PPDSN distribution state
-                    self._sm.set(
-                        config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
-                        self.state.to_dist_dict())
+                    # push PPDSN distribution form of the state
+                    self._sm.set(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
+                                 self.state.to_dist_dict())
 
-                    # push generic state
-                    self._sm.set(
-                        config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
-                        util.instance_to_dict(self.state))
+                    # push generic form of the state
+                    obj = util.instance_to_dict(self.state)
+                    obj['timestamp'] = time.time()
+                    self._sm.set(config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
+                                 obj)
 
                     # reset state changed flag
                     self.state_changed = False
