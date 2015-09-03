@@ -94,7 +94,8 @@ class Reactor:
         self._probe_response_queue = multiprocessing.Queue()
 
         # instantiate the Tracker first, this will validate the configuration
-        # and throw an exception if there is a problem with it
+        # and throw an exception if there is a problem with it,
+        # while we're still single threaded
         self._tracker = Tracker(
             probe_request_queue=self._probe_request_queue,
             probe_response_queue=self._probe_response_queue)
