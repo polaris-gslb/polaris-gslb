@@ -11,7 +11,7 @@ remote-connection-string=pipe:command=/opt/python3/bin/python3 /opt/polaris/bin/
 # distributor-threads   Default number of Distributor (backend) threads to start
 #
 # distributor-threads=3
-distributor-threads=7
+distributor-threads=6
 
 #################################
 # loglevel  Amount of logging. Higher is more. Do not set below 3
