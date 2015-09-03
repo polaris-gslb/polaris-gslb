@@ -2,7 +2,6 @@
 
 import logging
 import logging.config
-import ipaddress
 
 from polaris_health import Error, config
 
