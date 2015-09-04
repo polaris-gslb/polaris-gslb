@@ -9,14 +9,16 @@ import shutil
 
 from setuptools import setup, find_packages
 
+VERSION = '0.3.0'
+
 INSTALL_PREFIX = os.path.join('/opt', 'polaris')
 
 # determine the directory where setup.py is located
 PWD = os.path.abspath(
     os.path.split(inspect.getfile(inspect.currentframe()))[0])
 
-setup (
-    version='0.3.0',
+setup(
+    version=VERSION,
     author='Anton Gavrik',    
     name='polaris-gslb',
     description=('A simple, extendable Global Server Load Balancing(GSLB) '
@@ -26,6 +28,13 @@ setup (
         'pyyaml',
         'python3-memcached', 
         'python-daemon-3K'
+    ],
+    license='BSD 3-Clause',
+    url='https://github.com/polaris-gslb/polaris-gslb',
+    download_url=('https://github.com/polaris-gslb/polaris-gslb/tarball/v{}'
+                  .format(VERSION)),
+    classifiers=[
+        'Programming Language :: Python :: 3',
     ]
 )
 
