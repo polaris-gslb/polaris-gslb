@@ -27,8 +27,7 @@ class Polaris(RemoteBackend):
         super(Polaris, self).__init__()
 
         # shared memory client
-        self._sm = memcache.Client(
-            [config.BASE['SHARED_MEM_HOSTNAME']])   
+        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])   
        
         # this will hold the distribution state
         self._state = {}
@@ -128,19 +127,13 @@ class Polaris(RemoteBackend):
         ### pool is DOWN ###
         ####################
         else:
-            # use the _default distribution table
-            if pool['fallback'] == 'any':
-                pass
-
-            # return empty RR-set
-            elif pool['fallback'] == 'nodata':
-                self.result = []
-                return
-
-            # refuse query(SOA response must return False as well)
-            elif pool['fallback'] == 'refuse':
+            # if fallback is set to "refuse", refuse the query
+            # (SOA response must return False as well)
+            if pool['fallback'] == 'refuse':
                 self.result = False
                 return
+
+            # otherwise(fallback is "any") use the _default distribution table
 
         # log the distribution table used
         self.log.append('dist table used: {}'
@@ -154,11 +147,10 @@ class Polaris(RemoteBackend):
         else:    
             num_records_return = pool['max_addrs_returned']
 
-        # if we don't have anything to return(all members have the weight of 0)
-        # set the self.result to empty list and return
-        # this will result in an empty RR-set response
+        # if we don't have anything to return(all member weights may have
+        # been set of 0), set the result to false
         if num_records_return == 0:
-            self.result = []
+            self.result = False
             return
 
         ### add records to the response ###
@@ -177,16 +169,17 @@ class Polaris(RemoteBackend):
                 dist_table['index'] = 0
 
     def _soa_response(self, params):
-        """Generate a response to a SOA query"""
+        """Generate a response to a SOA query
 
+        """
         # if pool is DOWN and fallback is set to "refuse", refuse SOA queries
         # when both SOA any ANY results in False the pdns will produce a REFUSE
         qname = params['qname'].lower()
         pool_name = self._state['globalnames'][qname]['pool_name']
         pool = self._state['pools'][pool_name]
         if not pool['status'] and pool['fallback'] == 'refuse':
-                self.result = False
-                return
+            self.result = False
+            return
 
         # append ns with a dot here
         ns = '{}.'.format(config.BASE['HOSTNAME'])
