@@ -111,7 +111,7 @@ class Pool:
     """A pool of backend servers"""
 
     LB_METHOD_OPTIONS = [ 'wrr', 'twrr' ]
-    FALLBACK_OPTIONS = [ 'any', 'refuse', 'nodata' ]
+    FALLBACK_OPTIONS = [ 'any', 'refuse' ]
 
     def __init__(self, name, monitor, members, lb_method,
                  fallback='any', max_addrs_returned=1):
@@ -127,7 +127,6 @@ class Pool:
                 "any": perform distribution amongst all configured
                     members(ignore health status)
                 "refuse": refuse queries
-                "nodata": return an empty RR-set
             max_addrs_returned: int, max number of A records to return in
                 response
         
