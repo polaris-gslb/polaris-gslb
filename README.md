@@ -11,8 +11,7 @@ A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traf
     * HTTP
 * Up to 32 addresses returned in a response
 * Different ways to handle all-pool-members-DOWN situation(fallback):
-    * refuse query
-    * answer with NOERROR and no answer section data
+    * refuse queries
     * return any configured end-points(ignore the health status)
 
 See the [WIKI](https://github.com/polaris-gslb/polaris-core/wiki) for installation, configuration and other information.
