@@ -6,7 +6,7 @@ A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traf
 * Load-balancing methods:
     * Weighted round-robin
     * Topology(direct clients to the end-points in the same region/datacenter)
-* Parametrized(timeout, interval, retries etc.) health monitors:
+* Parameterized(timeout, interval, retries etc.) health monitors:
     * TCP
     * HTTP
 * Up to 32 addresses returned in a response
