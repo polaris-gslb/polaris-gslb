@@ -116,6 +116,10 @@ class Tracker(multiprocessing.Process):
         
         ### probe success ###
         if probe.status:
+            # reset the value of retries left to the parent's pool value
+            member.retries_left = \
+                self.state.pools[probe.pool_name].monitor.retries
+
             # if member is in UP state, do nothing and return
             if member.status is True:
                 return
@@ -123,10 +127,6 @@ class Tracker(multiprocessing.Process):
             # member is either in DOWN state or a new member, bring it UP
             else:
                 member.status = True
-                # set retries left to the value of the parent's pool 
-                # monitor retries
-                member.retries_left = \
-                    self.state.pools[probe.pool_name].monitor.retries
 
         ### probe failed ###
         else:
