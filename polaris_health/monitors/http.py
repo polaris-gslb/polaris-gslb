@@ -20,7 +20,7 @@ class HTTP(BaseMonitor):
     """HTTP monitor"""    
 
     def __init__(self, use_ssl=False, hostname=None, url_path='/', port=None,
-                 interval=10, timeout=2, retires=2):
+                 interval=10, timeout=2, retries=2):
         """
         args:
             use_ssl: bool, whether to use SSL
@@ -34,7 +34,7 @@ class HTTP(BaseMonitor):
 
         """
         super(HTTP, self).__init__(interval=interval, timeout=timeout,
-                                         retries=retires)
+                                         retries=retries)
         
         ### use_ssl ###
         self.use_ssl = use_ssl
