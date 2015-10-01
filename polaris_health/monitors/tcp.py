@@ -26,7 +26,7 @@ class TCP(BaseMonitor):
     """TCP monitor base"""
 
     def __init__(self, port, send_string=None, match_re=None,
-                 interval=10, timeout=1, retires=2):
+                 interval=10, timeout=2, retries=2):
         """
         args:
             port: int, port number
@@ -38,7 +38,7 @@ class TCP(BaseMonitor):
 
         """
         super(TCP, self).__init__(interval=interval, timeout=timeout,
-                                      retries=retires)
+                                      retries=retries)
 
         ### port ###
         self.port = port
