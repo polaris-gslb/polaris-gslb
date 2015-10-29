@@ -1,4 +1,4 @@
-<p align="center"><img src="https://github.com/polaris-gslb/polaris-core/wiki/logo.png"/></p>
+## Polaris - guiding the traffic home.
 
 A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic manager.
 
