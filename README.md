@@ -1,6 +1,6 @@
-<p align="center">
-  <img src="https://github.com/polaris-gslb/polaris-core/wiki/logo.png"/>
-</p>
+<p align="center"><img src="https://github.com/polaris-gslb/polaris-core/wiki/logo.png"/></p>
+<p align="center">Guiding the traffic home</p>
+```
 
 A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic manager.
 
