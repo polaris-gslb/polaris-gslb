@@ -1,8 +1,6 @@
 <p align="center">
   <img src="https://github.com/polaris-gslb/polaris-core/wiki/logo.png"/>
 </p>
-<p align="center">Embrace Automation
-</p>
 
 ## Polaris - guiding the traffic home.
 
