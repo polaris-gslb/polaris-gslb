@@ -8,7 +8,7 @@ import queue
 import memcache
 
 from polaris_health import config, state, util
-from .probe import Probe
+from polaris_health.prober import Probe
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())

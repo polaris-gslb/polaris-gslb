@@ -10,11 +10,9 @@ import json
 
 import memcache
 
-from polaris_health import config
-from .tracker import Tracker
-from .prober import Prober
+from polaris_health import Error, config, prober, tracker
 
-__all__ = [ 'Reactor' ]
+__all__ = [ 'Runtime' ]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
@@ -27,7 +25,7 @@ HEARTBEAT_LOG_INTERVAL = 10
 HEARTBEAT_TTL = 31
 
 # this holds multiprocessing.Process() objects
-# of the child processes spawned by the Reactor
+# of the child processes spawned by the Control
 PROCESSES = []
 # maximum number of times to .terminate() an alive process
 MAX_TERMINATE_ATTEMPTS = 5
@@ -35,7 +33,7 @@ MAX_TERMINATE_ATTEMPTS = 5
 TERMINATE_ATTEMPT_DELAY = 0.2
 
 def sig_handler(signo, stack_frame):
-    """Terminate all processes spawned by the Reactor()
+    """Terminate all processes spawned by the Control()
 
     It has been observed that sometimes a process does not exit
     on .terminate(), we attempt to .terminate() it several times.
@@ -76,11 +74,16 @@ def sig_handler(signo, stack_frame):
             except OSError:
                 pass
 
-class Reactor:
+class Runtime:
 
-    """Main manager process"""
+    """Runtime process"""
 
     def __init__(self):
+        self._load_configuration()
+
+    def start(self):
+        """Start Polaris health"""
+
         LOG.info('starting Polaris health...')
 
         global PROCESSES
@@ -183,4 +186,52 @@ class Reactor:
                 t_last = t_now
 
             time.sleep(HEARTBEAT_LOOP_INTERVAL)
+
+    def _load_configuration(self):        
+        """load configuration from the file system"""
+
+        try:
+            config.BASE['INSTALL_PREFIX'] = \
+                os.environ['POLARIS_INSTALL_PREFIX']
+        except KeyError:
+            log_msg = 'POLARIS_INSTALL_PREFIX env. variable is not set'
+            LOG.error(log_msg)
+            raise Error(log_msg)
+
+# load BASE configuration
+    base_config_file = os.path.join(
+        INSTALL_PREFIX, 'etc', 'polaris-health.yaml')
+    if os.path.isfile(base_config_file):
+        with open(base_config_file) as fp:
+            base_config = yaml.load(fp)
+
+        if base_config:
+            # validate and set values
+            for k in base_config:
+                if k not in config.BASE:
+                    raise Exception('unknown configuration option "{}"'
+                                                                        .format(k))
+                else:
+                    config.BASE[k] = base_config[k]
+
+    # load LB configuration
+    lb_config_file = os.path.join(
+        INSTALL_PREFIX, 'etc', 'polaris-lb.yaml')
+    if not os.path.isfile(lb_config_file):
+        raise Exception('{} does not exist'.format(lb_config_file))
+    else:
+        with open(lb_config_file) as fp:
+            config.LB = yaml.load(fp)
+
+    # load TOPOLOGY_MAP configuration
+    topology_config_file = os.path.join(
+        INSTALL_PREFIX, 'etc', 'polaris-topology.yaml')
+    if os.path.isfile(topology_config_file):
+        with open(topology_config_file) as fp:
+            topology_config = yaml.load(fp)
+
+        if topology_config:
+            config.TOPOLOGY_MAP = \
+                topology.config_to_map(topology_config)
+
 

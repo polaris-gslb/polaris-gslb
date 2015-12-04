@@ -7,7 +7,7 @@ __all__ = [
 ]
 
 BASE = {
-    'INSTALL_PREFIX': '/opt/polaris',
+    'INSTALL_PREFIX': None,
 
     'SHARED_MEM_HOSTNAME': '127.0.0.1',
     'SHARED_MEM_GENERIC_STATE_KEY': 'polaris_health:generic_state',
