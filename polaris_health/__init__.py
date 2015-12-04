@@ -1,10 +1,12 @@
 #-*- coding: utf-8 -*-
 
+
 class Error(Exception):
 
     """Generic exception"""
 
     pass
+
 
 class ProtocolError(Error):
 
@@ -12,16 +14,19 @@ class ProtocolError(Error):
 
     pass
 
+
 class MonitorFailed(Error):
 
     """Exception to signal health check failure, used by monitors"""
 
     pass
 
-from polaris_health.core.reactor import Reactor
+
+from polaris_health.runtime import Runtime
+
 
 # application entry point
-# polaris_health.config must be fully set before calling this
-def main():
-    reactor = Reactor()
+def start():
+    runtime = Runtime()
+    runtime.start()
 
