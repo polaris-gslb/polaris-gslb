@@ -116,8 +116,7 @@ class Reactor:
         self._procs_total = len(PROCESSES)
 
         # shared memory client
-        self._sm = memcache.Client(
-            config.BASE['SHARED_MEM_HOSTNAME'])
+        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
 
         # trap the signal to terminate upon
         signal.signal(signal.SIGTERM, sig_handler)
