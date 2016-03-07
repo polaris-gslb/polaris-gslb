@@ -1,0 +1,42 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          polaris-health
+# Required-Start:    $remote_fs $network $syslog
+# Required-Stop:     $remote_fs $network $syslog
+# Should-Start:
+# Should-Stop:
+# Default-Start:     3
+# Default-Stop:      0 1 6
+# Short-Description: Polaris Health
+# Description:       Polaris Health
+### END INIT INFO
+
+POLARIS_INSTALL_PREFIX=/opt/polaris
+export POLARIS_INSTALL_PREFIX
+
+POLARIS_CONTROL_CMD=$POLARIS_INSTALL_PREFIX/bin/polaris-health-control
+
+case "$1" in
+
+    stop)
+        echo "Stopping Polaris Health..."
+        ${POLARIS_CONTROL_CMD} stop
+    ;;
+
+    start)
+        echo "Starting Polaris Health..."
+        ${POLARIS_CONTROL_CMD} start
+    ;;
+
+    restart)
+        echo "Re-starting Polaris Health..."
+        ${POLARIS_CONTROL_CMD} restart
+    ;;
+
+    *)
+    echo init-polaris-health [start\|stop\|restart]
+
+    ;;
+
+esac
+
