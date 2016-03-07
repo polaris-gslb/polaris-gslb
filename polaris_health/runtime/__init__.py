@@ -2,15 +2,17 @@
 
 import logging
 import multiprocessing
-import sys
 import os
 import signal
 import time
 import json
 
 import memcache
+import yaml
 
+from polaris_common import topology
 from polaris_health import Error, config, prober, tracker
+
 
 __all__ = [ 'Runtime' ]
 
@@ -31,6 +33,7 @@ PROCESSES = []
 MAX_TERMINATE_ATTEMPTS = 5
 # delay between calling .terminate()
 TERMINATE_ATTEMPT_DELAY = 0.2
+
 
 def sig_handler(signo, stack_frame):
     """Terminate all processes spawned by the Control()
@@ -74,6 +77,7 @@ def sig_handler(signo, stack_frame):
             except OSError:
                 pass
 
+
 class Runtime:
 
     """Runtime process"""
@@ -99,14 +103,14 @@ class Runtime:
         # instantiate the Tracker first, this will validate the configuration
         # and throw an exception if there is a problem with it,
         # while we're still single threaded
-        self._tracker = Tracker(
-            probe_request_queue=self._probe_request_queue,
-            probe_response_queue=self._probe_response_queue)
-        PROCESSES.append(self._tracker)
+        p = tracker.Tracker(
+                probe_request_queue=self._probe_request_queue,
+                probe_response_queue=self._probe_response_queue)
+        PROCESSES.append(p)
 
         # instantiate Probers
         for i in range(config.BASE['NUM_PROBERS']):
-            p = Prober(
+            p = prober.Prober(
                 probe_request_queue=self._probe_request_queue,
                 probe_response_queue=self._probe_response_queue)
             PROCESSES.append(p)
@@ -189,48 +193,49 @@ class Runtime:
     def _load_configuration(self):        
         """load configuration from the file system"""
 
+        ### set config.BASE['INSTALL_PREFIX']
         try:
             config.BASE['INSTALL_PREFIX'] = \
                 os.environ['POLARIS_INSTALL_PREFIX']
         except KeyError:
-            log_msg = 'POLARIS_INSTALL_PREFIX env. variable is not set'
+            log_msg = 'POLARIS_INSTALL_PREFIX env is not set'
             LOG.error(log_msg)
             raise Error(log_msg)
 
-# load BASE configuration
-    base_config_file = os.path.join(
-        INSTALL_PREFIX, 'etc', 'polaris-health.yaml')
-    if os.path.isfile(base_config_file):
-        with open(base_config_file) as fp:
-            base_config = yaml.load(fp)
+        ### load BASE configuration
+        base_config_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-health.yaml')
+        if os.path.isfile(base_config_file):
+            with open(base_config_file) as fp:
+                base_config = yaml.load(fp)
 
-        if base_config:
-            # validate and set values
-            for k in base_config:
-                if k not in config.BASE:
-                    raise Exception('unknown configuration option "{}"'
-                                                                        .format(k))
-                else:
-                    config.BASE[k] = base_config[k]
+            if base_config:
+                # validate and set values
+                for k in base_config:
+                    if k not in config.BASE:
+                        raise Exception('unknown configuration option "{}"'
+                                        .format(k))
+                    else:
+                        config.BASE[k] = base_config[k]
 
-    # load LB configuration
-    lb_config_file = os.path.join(
-        INSTALL_PREFIX, 'etc', 'polaris-lb.yaml')
-    if not os.path.isfile(lb_config_file):
-        raise Exception('{} does not exist'.format(lb_config_file))
-    else:
-        with open(lb_config_file) as fp:
-            config.LB = yaml.load(fp)
+        ### load LB configuration
+        lb_config_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-lb.yaml')
+        if not os.path.isfile(lb_config_file):
+            raise Exception('{} does not exist'.format(lb_config_file))
+        else:
+            with open(lb_config_file) as fp:
+                config.LB = yaml.load(fp)
 
-    # load TOPOLOGY_MAP configuration
-    topology_config_file = os.path.join(
-        INSTALL_PREFIX, 'etc', 'polaris-topology.yaml')
-    if os.path.isfile(topology_config_file):
-        with open(topology_config_file) as fp:
-            topology_config = yaml.load(fp)
+        ### load TOPOLOGY_MAP configuration
+        topology_config_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-topology.yaml')
+        if os.path.isfile(topology_config_file):
+            with open(topology_config_file) as fp:
+                topology_config = yaml.load(fp)
 
-        if topology_config:
-            config.TOPOLOGY_MAP = \
-                topology.config_to_map(topology_config)
+            if topology_config:
+                config.TOPOLOGY_MAP = \
+                    topology.config_to_map(topology_config)
 
 

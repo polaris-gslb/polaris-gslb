@@ -5,7 +5,7 @@ import json
 
 import memcache
 
-from polaris_health.util import topology
+from polaris_common import topology
 
 from polaris_pdns import config
 from .remotebackend import RemoteBackend

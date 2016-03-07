@@ -3,7 +3,13 @@
 
 """Polaris health"""
 
-import polaris_health
+import daemon
 
-polaris_health.start()
+import polaris_health
+from polaris_health.util import log
+
+log.setup_debug()
+
+with daemon.DaemonContext():
+    polaris_health.start()
 
