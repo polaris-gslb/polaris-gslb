@@ -1,4 +1,3 @@
-.
 ## Polaris - guiding the traffic home.
 
 A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic manager.

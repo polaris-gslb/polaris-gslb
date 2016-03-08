@@ -27,6 +27,5 @@ from polaris_health.runtime import Runtime
 
 # application entry point
 def start():
-    runtime = Runtime()
-    runtime.start()
+    Runtime().start()
 
