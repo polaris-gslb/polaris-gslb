@@ -14,7 +14,7 @@ BASE = {
     'SHARED_MEM_PPDNS_STATE_KEY': 'polaris_health:ppdns_state',
     'SHARED_MEM_HEARTBEAT_KEY': 'polaris_health:heartbeat',
 
-    'NUM_PROBERS': 50,
+    'NUM_PROBERS': 2,
 
     'LOG_LEVEL': 'info',
     'LOG_HANDLER': 'syslog',

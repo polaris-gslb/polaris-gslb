@@ -10,6 +10,8 @@ from polaris_health.util import log
 
 log.setup_debug()
 
-with daemon.DaemonContext():
-    polaris_health.start()
+polaris_health.start()
+
+#with daemon.DaemonContext():
+#    polaris_health.start()
 
