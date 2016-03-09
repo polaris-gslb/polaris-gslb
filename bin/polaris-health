@@ -28,13 +28,18 @@ case "$1" in
         ${POLARIS_CONTROL_CMD} start
     ;;
 
+    start-debug)
+        echo "Starting Polaris Health..."
+        ${POLARIS_CONTROL_CMD} start-debug
+    ;;
+
     restart)
         echo "Re-starting Polaris Health..."
         ${POLARIS_CONTROL_CMD} restart
     ;;
 
     *)
-    echo init-polaris-health [start\|stop\|restart]
+    echo polaris-health [start\|start-debug\|stop\|restart]
 
     ;;
 
