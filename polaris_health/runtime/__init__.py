@@ -20,20 +20,18 @@ __all__ = [ 'Runtime' ]
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
-# timeout on control socket operations
-CONTROL_SOCKET_TIMEOUT = 0.1
+# a timeout on control socket so we don't eat CPU in the control loop
+# also affects how often Runtime healthcheck is ran
+CONTROL_SOCKET_TIMEOUT = 0.5
 
-# how often in seconds to run the heartbeat loop
-HEARTBEAT_LOOP_INTERVAL = 0.5
-# how often in seconds to log heartbeat into shared mem
-HEARTBEAT_LOG_INTERVAL = 10
-# how long in seconds should a heartbeat live in shared mem
-HEARTBEAT_TTL = 31
+# how often in seconds a heartbeat is written
+# heartbeat TTL is set to + 1
+HEARTBEAT_INTERVAL = 1
 
 # maximum number of times to .terminate() an alive process
 MAX_TERMINATE_ATTEMPTS = 5
 # delay between calling .terminate()
-TERMINATE_ATTEMPT_DELAY = 0.2
+TERMINATE_ATTEMPT_DELAY = 0.1
 
 
 class Runtime:
@@ -41,6 +39,9 @@ class Runtime:
     """Polaris runtime"""
 
     def __init__(self):
+        self._procs_started = None
+        self._control_socket = None
+
         # this holds multiprocessing.Process() objects
         # of the child processes spawned by the Runtime
         self._processes = []
@@ -56,13 +57,73 @@ class Runtime:
         # consumed by Tracker
         self._probe_response_queue = multiprocessing.Queue()
 
-    def start(self):
-        """Start Polaris health"""
-        LOG.info('starting Polaris health...')
+    @staticmethod
+    def load_configuration():        
+        """Load configuration from file system"""
+        LOG.debug('loading Polaris health configuration')
 
-        # load configuration from files
-        LOG.debug('loading configuration')
-        self._load_configuration()
+        ### set config.BASE['INSTALL_PREFIX']
+        try:
+            config.BASE['INSTALL_PREFIX'] = \
+                os.environ['POLARIS_INSTALL_PREFIX']
+        except KeyError:
+            log_msg = 'POLARIS_INSTALL_PREFIX env is not set'
+            LOG.error(log_msg)
+            raise Error(log_msg)
+
+        ### load BASE configuration ###
+        base_config_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-health.yaml')
+        if os.path.isfile(base_config_file):
+            with open(base_config_file) as fp:
+                base_config = yaml.load(fp)
+
+            if base_config:
+                # validate and set values
+                for k in base_config:
+                    if k not in config.BASE:
+                        log_msg =('unknown configuration option "{}"'
+                                   .format(k))
+                        LOG.error(log_msg)
+                        raise Error(log_msg)
+                    else:
+                        config.BASE[k] = base_config[k]
+
+        # hard set file paths based on INSTALL_PREFIX
+        config.BASE['PID_FILE'] = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'run', 'polaris-health.pid')
+
+        config.BASE['CONTROL_SOCKET_FILE'] = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 
+            'run', 'polaris-health.controlsocket')
+
+        ### load LB configuration ###
+        lb_config_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-lb.yaml')
+        if not os.path.isfile(lb_config_file):
+            log_msg = '{} does not exist'.format(lb_config_file)
+            LOG.error(log_msg)
+            raise Error(log_msg)
+        else:
+            with open(lb_config_file) as fp:
+                config.LB = yaml.load(fp)
+
+        ### load TOPOLOGY_MAP configuration ###
+        topology_config_file = os.path.join(
+            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-topology.yaml')
+        if os.path.isfile(topology_config_file):
+            with open(topology_config_file) as fp:
+                topology_config = yaml.load(fp)
+
+            if topology_config:
+                config.TOPOLOGY_MAP = topology.config_to_map(topology_config)
+
+    def start(self):
+        """Start Polaris health
+
+        Configuration must be loaded prior to calling this
+        """
+        LOG.info('starting Polaris health')
 
         # instantiate the Tracker first, this will validate the configuration
         # and throw an exception if there is a problem with it,
@@ -88,9 +149,9 @@ class Runtime:
             p.start()
 
         # Avoid code that migth throw an exceptions between child procs
-        # started/exited markers, if an exception must be included, 
-        # the handling code must terminate all
-        # the child processes(call self.stop()) prior to exiting
+        # started/exited markers, if an exception must be included, the 
+        # handling code must terminate all the child processes
+        # (self._terminate_child_procs()) prior to exiting to avoid zombies
 
         ###########################
         # Child processes started # 
@@ -102,10 +163,10 @@ class Runtime:
         # trap SIGTERM to self.sigterm_handler
         signal.signal(signal.SIGTERM, self._sigterm_handler)
 
-        # run the heartbeat loop
-        self._heartbeat_loop()
+        # run the control loop
+        self._control_loop()
 
-        # heartbeat loop returns when no processes are left running,
+        # control loop returns when no processes are left running,
         # join() the processes
         for p in self._processes:
             p.join()
@@ -114,15 +175,94 @@ class Runtime:
         # Child processes exited #
         ##########################
 
+        # clean up the control socket
+        if self._control_socket:
+            self._control_socket.close()
+        self._delete_control_socket_file()
+
         # delete pid file
         self._delete_pid_file()
 
-        # delete control socket file
-        self._delete_control_socket_file()
-
         LOG.info('Polaris health finished execution')
 
-    def stop(self):
+    def _control_loop(self):
+        """Accept and processes incoming connections on the control socket,
+        verify that all the processes spawned by the Runtime are alive,
+        push heartbeat into the shared memory
+        """
+        # set last time so that "if t_now - t_last >= HEALTHCHECK_INTERVAL"
+        # below evalutes to True on the first run and a heartbeat is written
+        t_last = time.time() - HEARTBEAT_INTERVAL - 1
+
+        while True:
+
+            ### process control connections
+            try:
+                conn, client_addr = self._control_socket.accept()
+            except OSError:
+                pass
+            else:
+                try:
+                    self._process_control_connection()
+                except Exception as e:
+                    log_msg = ('caught {} {} during control '
+                               'connection processing'
+                               .format(e.__class__.__name__, e))
+                    LOG.warning(log_msg)
+                               
+            ### health check the Runtime
+            # count the number of processes alive
+            alive = 0
+            for p in self._processes:
+                if p.is_alive():
+                    alive += 1
+
+            # no processes are alive - exit the control loop
+            if alive == 0:
+                LOG.debug(
+                    'no child processes are alive, exiting the control loop')
+                return
+
+            # some child procs crashed
+            if alive != self._procs_started:
+                log_msg = ('processes started: {} processes alive: {}'
+                           .format(self._procs_started, alive))
+                LOG.error(log_msg)
+                self._terminate_child_procs()
+                return
+
+            ### heartbeat
+            t_now = time.time()
+            if t_now - t_last >= HEARTBEAT_INTERVAL:
+
+                obj = { 'timestamp': time.time() }
+
+                val = self._sm.set(config.BASE['SHARED_MEM_HEARTBEAT_KEY'],
+                                   json.dumps(obj), 
+                                   HEARTBEAT_INTERVAL + 1)
+                if val is not True:
+                    log_msg = 'failed to write heartbeat to the shared memory'
+                    LOG.error(log_msg)
+
+                t_last = t_now
+
+    def _process_control_connection(self, conn):
+        """Process connections on control socket"""
+        data = conn.recv(64)
+        if data:
+            cmd = data.decode()
+
+            if cmd == 'ping':
+                conn.sendall('pong'.encode())
+            elif cmd == 'stop':
+                self._terminate_child_procs()
+            else:
+                LOG.warning('unknown control socket command "{}"'
+                            .format(cmd))
+
+        conn.close()
+
+    def _terminate_child_procs(self):
         """Terminate all processes spawned by the Runtime
 
         It has been observed that sometimes a process does not exit
@@ -140,11 +280,12 @@ class Runtime:
             # give the processes some time to terminate
             time.sleep(TERMINATE_ATTEMPT_DELAY)
 
-            # if we still have processes running, run the termination loop again 
+            # if we still have processes running, 
+            # run the termination loop again 
             for p in self._processes:
                 if p.is_alive():
-                    LOG.warning('process {} is still running after .terminate() '
-                                'attempt {}'.format(p, i))
+                    LOG.warning('process {} is still running after ' 
+                                'terminate() attempt {}'.format(p, i))
                     break
             # no processes are alive, exit out
             else:
@@ -160,156 +301,75 @@ class Runtime:
                 except OSError:
                     pass
 
+
     def _create_pid_file(self):
         """Create file containing the PID of the Runtime process"""
-        self._pid_file = os.path.join(
-            config.BASE['INSTALL_PREFIX'], 'run', 'polaris-health.pid')
-        LOG.debug('writting {}'.format(pid_file))
+        LOG.debug('writting {}'.format(config.BASE['PID_FILE']))
 
         try:
-            with open(pid_file, 'w') as fh:
+            with open(config.BASE['PID_FILE'], 'w') as fh:
                 fh.write(str(os.getpid()))
         except OSError as e:
-            log_msg = 'unable tocreate {} - {}'.format(self._pid_file, e)
+            log_msg = ('unable to create pid file {} - {} {}'
+                       .format(config.BASE['PID_FILE'],
+                               e.__class__.__name__, e))
             LOG.error(log_msg)
             raise Error(log_msg)
 
     def _delete_pid_file(self):
         """Delete Runtime process PID file"""
-        LOG.debug('removing {}'.format(self._pid_file))
+        LOG.debug('removing {}'.format(config.BASE['PID_FILE']))
         try:
-            os.remove(self._pid_file)
+            os.remove(config.BASE['PID_FILE'])
         except OSError as e:
-            log_msg = 'unable to delete {} - {}'.format(self._pid_file, e)
+            log_msg = ('unable to delete pid file {} - {} {}'
+                       .format(config.BASE['PID_FILE'], 
+                               e.__class__.__name__, e))
             LOG.error(log_msg)
             raise Error(log_msg)
 
     def _init_control_socket(self):
         """Initialize control socket
 
-        self._control_socket is created and bound to self._control_socket_file
+        self._control_socket is created and bound to config.BASE['CONTROL_SOCKET_FILE']
         """
         LOG.debug('initializing control socket')
 
-        self._control_socket_file = os.path.join(
-            config.BASE['INSTALL_PREFIX'],
-            'run', 
-            'polaris-health.controlsocket')
-        
         # make sure socket file does not exist
         self._delete_control_socket_file()
 
         self._control_socket = socket.socket(socket.AF_UNIX,
                                              socket.SOCK_STREAM)
-        # set a small timeout
+
+        # set a timeout on control socket 
+        #so we don't eat CPU in the control loop
         self._control_socket.settimeout(CONTROL_SOCKET_TIMEOUT)
 
         try:
-            sock.bind(self._control_socket_file)
+            self._control_socket.bind(config.BASE['CONTROL_SOCKET_FILE'])
         except OSError as e:
-            log_msg = 'unable to bind control socket - {}'.format(e)
+            log_msg = ('unable to bind control socket {} - {} {}'
+                       .format(config.BASE['CONTROL_SOCKET_FILE'], 
+                               e.__class__.__name__, e))
             LOG.error(log_msg)
             raise Error(log_msg)
+
+        # listen on the socket for incoming control connections
+        self._control_socket.listen(1)
 
     def _delete_control_socket_file(self):
         """Delete control socket file"""
         try:
-            os.unlink(self._control_socket_file)
-        except OSError:
-            if os.path.exists(self._control_socket_file)
-                log_msg = ('unable to delete {}'
-                           .format(self._control_socket_file))
+            os.unlink(config.BASE['CONTROL_SOCKET_FILE'])
+        except OSError as e:
+            if os.path.exists(config.BASE['CONTROL_SOCKET_FILE']):
+                log_msg = ('unable to delete control socket {} - {} {}'
+                           .format(config.BASE['CONTROL_SOCKET_FILE'],
+                                   e.__class__.__name__, e))
                 LOG.error(log_msg)
-
-    def _heartbeat_loop(self):
-        """Periodically log various internal application stats
-        to the shared memory.
-        """
-        # set last time so that "if t_now - t_last >= HEARTBEAT_LOG_INTERVAL"
-        # below evalutes to True on the first run
-        t_last = time.time() - HEARTBEAT_LOG_INTERVAL - 1
-        while True:
-            alive = 0
-            # count alive processes 
-            for p in self._processes:
-                if p.is_alive():
-                    alive += 1
-
-            # no processes are alive - exit heartbeat loop
-            if alive == 0:
-                return
-
-            t_now = time.time()
-            if t_now - t_last >= HEARTBEAT_LOG_INTERVAL:
-                # log heartbeat
-                obj = { 
-                    'timestamp': time.time(),
-                    'child_procs_total': self._procs_started,
-                    'child_procs_alive': alive,
-                    'probe_req_queue_len': self._probe_request_queue.qsize(),
-                    'probe_resp_queue_len': \
-                        self._probe_response_queue.qsize(),    
-                }
-                
-                # push to shared mem
-                self._sm.set(config.BASE['SHARED_MEM_HEARTBEAT_KEY'],
-                             json.dumps(obj), HEARTBEAT_TTL)
-                LOG.debug('pushed a heartbeat to the shared memory')
-
-                t_last = t_now
-
-            time.sleep(HEARTBEAT_LOOP_INTERVAL)
 
     def _sigterm_handler(self, signo, stack_frame):
         LOG.info('received sig {}, terminating {} processes...'.format(
                  signo, len(self._processes)))
-        self.stop()
-
-    def _load_configuration(self):        
-        """load configuration from the file system"""
-
-        ### set config.BASE['INSTALL_PREFIX']
-        try:
-            config.BASE['INSTALL_PREFIX'] = \
-                os.environ['POLARIS_INSTALL_PREFIX']
-        except KeyError:
-            log_msg = 'POLARIS_INSTALL_PREFIX env is not set'
-            LOG.error(log_msg)
-            raise Error(log_msg)
-
-        ### load BASE configuration
-        base_config_file = os.path.join(
-            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-health.yaml')
-        if os.path.isfile(base_config_file):
-            with open(base_config_file) as fp:
-                base_config = yaml.load(fp)
-
-            if base_config:
-                # validate and set values
-                for k in base_config:
-                    if k not in config.BASE:
-                        raise Exception('unknown configuration option "{}"'
-                                        .format(k))
-                    else:
-                        config.BASE[k] = base_config[k]
-
-        ### load LB configuration
-        lb_config_file = os.path.join(
-            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-lb.yaml')
-        if not os.path.isfile(lb_config_file):
-            raise Exception('{} does not exist'.format(lb_config_file))
-        else:
-            with open(lb_config_file) as fp:
-                config.LB = yaml.load(fp)
-
-        ### load TOPOLOGY_MAP configuration
-        topology_config_file = os.path.join(
-            config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-topology.yaml')
-        if os.path.isfile(topology_config_file):
-            with open(topology_config_file) as fp:
-                topology_config = yaml.load(fp)
-
-            if topology_config:
-                config.TOPOLOGY_MAP = \
-                    topology.config_to_map(topology_config)
+        self._terminate_child_procs()
 

@@ -21,11 +21,3 @@ class MonitorFailed(Error):
 
     pass
 
-
-from polaris_health.runtime import Runtime
-
-
-# application entry point
-def start():
-    Runtime().start()
-
