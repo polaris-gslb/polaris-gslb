@@ -174,7 +174,6 @@ class Tracker(multiprocessing.Process):
             pool = self.state.pools[pool_name]
             for member_ip in pool.members:
                 member = pool.members[member_ip]
-
                 # request probe if required
                 self._request_probe(pool, member)
 
@@ -197,13 +196,15 @@ class Tracker(multiprocessing.Process):
         else:
             member.retries_left = pool.monitor.retries
             request_probe = True
-
+        
         if request_probe:
             # issue probe
             probe = Probe(pool_name=pool.name,
                           member_ip=member.ip,
                           monitor=pool.monitor)
+
             self.probe_request_queue.put(probe) 
+
             # update the time when the probe was issued
             member.last_probe_issued_time = time.time()
         

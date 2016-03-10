@@ -12,92 +12,92 @@ from polaris_health.runtime import Runtime
 from polaris_health.util import log
 
 
-class PolarisHealthControl:
+# control socket recv() buffer size
+CONTROL_SOCKET_RECV_BUFF_SIZE = 256
 
 
-    def __init__(self, debug=False):
-        self.debug = debug
-
-        if self.debug:
-            log.setup_debug()
-        else:
-            log.setup()
-
-        # this will load polaris_health.config
-        Runtime.load_configuration()
-
-    def start(self):
-        """Start Polaris health 
-
-        In debug the app will not daemonize
-        """
-        # check if Polaris is already running
-        if os.path.exists(polaris_health.config.BASE['CONTROL_SOCKET_FILE']):
-            try:    
-                if self.send_control_sock_cmd('ping') == 'pong':
-                    raise Exception('Polaris health is already running')
-            except OSError:
-                pass
-
-        if self.debug:
-            Runtime().start()
-        else:
-            log.setup()
-            # turn into a daemon, no code will execute after this
-            with daemon.DaemonContext():
-                Runtime().start()
-
-    def stop(self):
-        """Stop Polaris health 
-        """
-        # check if Polaris is running
-        if os.path.exists(polaris_health.config.BASE['CONTROL_SOCKET_FILE']):
-            try:    
-                if self.send_control_sock_cmd('ping') == 'pong':
-                    raise Exception('Polaris health is already running')
-            except OSError:
-                pass
-
-        if self.debug:
-            Runtime().start()
-        else:
-            log.setup()
-            # turn into a daemon, no code will execute after this
-            with daemon.DaemonContext():
-                Runtime().start()
-
-
-
-
-
-    def send_control_sock_cmd(self, cmd):
-        """Connect to control socket, send cmd, 
-        return the response received"""    
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        sock.connect(polaris_health.config.BASE['CONTROL_SOCKET_FILE'])
-        sock.sendall(cmd.encode())
-        resp = sock.recv(64).decode()
-        sock.close()
-
-        return resp
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Polaris health control")
+def main():
+    parser = argparse.ArgumentParser(
+        description="Polaris health control")
 
     parser.add_argument('action',
                         choices=[
+                            'ping',
                             'start',
                             'start-debug',
+                            'stop',
                             ]) 
 
     opts = parser.parse_args()
 
-    if 'debug' in opts.action:
-        phc = PolarisHealthControl(debug=True)
-    else:
-        phc = PolarisHealthControl(debug=False)      
+    phc = PolarisHealthControl()
 
-    if opts.action == 'start' or opts.action == 'start-debug':
+    # ping
+    if opts.action == 'ping':
+        phc.ping()
+
+    # start    
+    elif opts.action == 'start':
         phc.start()
+
+    # start-debug
+    elif opts.action == 'start-debug':
+        phc.start(debug=True)      
+
+    # stop
+    elif opts.action == 'stop':    
+        phc.stop()
+
+
+class PolarisHealthControl:
+
+    def __init__(self):
+        # load polaris_health.config
+        Runtime.load_configuration()
+
+    def ping(self):
+        self._send_control_sock_cmd('ping') == 'pong'
+        
+    def start(self, debug=False):
+        """In debug the app will not daemonize, logs are sent to stdout
+        """
+        if self._is_running():
+            raise Exception('Polaris health is already running')
+
+        if debug:
+            log.setup_debug()
+            Runtime().start()
+        else:
+            log.setup()
+            # turn into a daemon, NO CODE WILL EXECUTE AFTER THIS
+            with daemon.DaemonContext():
+                r = Runtime()
+                r.start()
+
+    def stop(self):
+        if not self._is_running(): 
+            raise Exception('Polaris health is not running')
+
+        self._send_control_sock_cmd('stop')
+
+    def _is_running(self):
+        try:
+            if self._send_control_sock_cmd('ping') == 'pong':
+                return True
+            else:
+                return False
+        except OSError:
+            return False
+
+    def _send_control_sock_cmd(self, cmd):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        sock.connect(polaris_health.config.BASE['CONTROL_SOCKET_FILE'])
+        sock.sendall(cmd.encode())
+        resp = sock.recv(CONTROL_SOCKET_RECV_BUFF_SIZE).decode()
+        sock.close()
+        return resp
+
+if __name__ == '__main__':
+    main()
 
