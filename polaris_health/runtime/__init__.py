@@ -23,6 +23,8 @@ LOG.addHandler(logging.NullHandler())
 # a timeout on control socket so we don't eat CPU in the control loop
 # also affects how often Runtime healthcheck is ran
 CONTROL_SOCKET_TIMEOUT = 0.5
+# control socket recv() buffer size 
+CONTROL_SOCKET_RECV_BUFF_SIZE = 256
 
 # how often in seconds a heartbeat is written
 # heartbeat TTL is set to + 1
@@ -51,11 +53,11 @@ class Runtime:
 
         # probe requests are put on this queue by Tracker
         # to be consumed by Prober processes
-        self._probe_request_queue = multiprocessing.Queue()
+        #self._probe_request_queue = multiprocessing.Queue()
 
         # processed probes are put on this queue by Prober processes to be
         # consumed by Tracker
-        self._probe_response_queue = multiprocessing.Queue()
+        #self._probe_response_queue = multiprocessing.Queue()
 
     @staticmethod
     def load_configuration():        
@@ -124,6 +126,14 @@ class Runtime:
         Configuration must be loaded prior to calling this
         """
         LOG.info('starting Polaris health')
+
+        # probe requests are put on this queue by Tracker
+        # to be consumed by Prober processes
+        self._probe_request_queue = multiprocessing.Queue()
+
+        # processed probes are put on this queue by Prober processes to be
+        # consumed by Tracker
+        self._probe_response_queue = multiprocessing.Queue()
 
         # instantiate the Tracker first, this will validate the configuration
         # and throw an exception if there is a problem with it,
@@ -203,7 +213,7 @@ class Runtime:
                 pass
             else:
                 try:
-                    self._process_control_connection()
+                    self._process_control_connection(conn)
                 except Exception as e:
                     log_msg = ('caught {} {} during control '
                                'connection processing'
@@ -214,6 +224,7 @@ class Runtime:
             # count the number of processes alive
             alive = 0
             for p in self._processes:
+                LOG.info('healthchecking %r' % p)
                 if p.is_alive():
                     alive += 1
 
@@ -248,7 +259,7 @@ class Runtime:
 
     def _process_control_connection(self, conn):
         """Process connections on control socket"""
-        data = conn.recv(64)
+        data = conn.recv(CONTROL_SOCKET_RECV_BUFF_SIZE)
         if data:
             cmd = data.decode()
 
@@ -301,7 +312,6 @@ class Runtime:
                 except OSError:
                     pass
 
-
     def _create_pid_file(self):
         """Create file containing the PID of the Runtime process"""
         LOG.debug('writting {}'.format(config.BASE['PID_FILE']))
@@ -331,7 +341,8 @@ class Runtime:
     def _init_control_socket(self):
         """Initialize control socket
 
-        self._control_socket is created and bound to config.BASE['CONTROL_SOCKET_FILE']
+        self._control_socket is created and bound 
+        to config.BASE['CONTROL_SOCKET_FILE']
         """
         LOG.debug('initializing control socket')
 
@@ -341,8 +352,8 @@ class Runtime:
         self._control_socket = socket.socket(socket.AF_UNIX,
                                              socket.SOCK_STREAM)
 
-        # set a timeout on control socket 
-        #so we don't eat CPU in the control loop
+        # set a timeout on the control socket 
+        # so we don't eat CPU in the control loop
         self._control_socket.settimeout(CONTROL_SOCKET_TIMEOUT)
 
         try:
