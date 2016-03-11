@@ -36,7 +36,7 @@ case "$1" in
     start)
         echo -n "Starting Polaris Health... "
 
-        # check if running already
+        # ensure polaris is not already running
         doControl ping ; EC=$?
         if test "$EC" = "0"
         then
@@ -64,7 +64,7 @@ case "$1" in
     stop)
         echo -n "Stopping Polaris Health... "
         
-        # check if not running
+        # ensure polaris is running
         doControl ping ; EC=$?
         if test "$EC" != "0"
         then
@@ -79,7 +79,7 @@ case "$1" in
     restart)
         echo -n "Restarting Polaris Health... "
 
-        # check if not running
+        # ensure polaris is running
         doControl ping ; EC=$?
         if test "$EC" != "0"
         then

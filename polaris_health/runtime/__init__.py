@@ -12,7 +12,7 @@ import memcache
 import yaml
 
 from polaris_common import topology
-from polaris_health import Error, config, prober, tracker
+from polaris_health import Error, config, util, prober, tracker
 
 
 __all__ = [ 'Runtime' ]
@@ -20,14 +20,13 @@ __all__ = [ 'Runtime' ]
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
-# a timeout on control socket so we don't eat CPU in the control loop
+# timeout on control socket so we don't eat CPU in the control loop
 # also affects how often Runtime healthcheck is ran
 CONTROL_SOCKET_TIMEOUT = 0.5
 # control socket recv() buffer size 
 CONTROL_SOCKET_RECV_BUFF_SIZE = 256
 
-# how often in seconds a heartbeat is written
-# heartbeat TTL is set to + 1
+# how often in seconds a heartbeat is written, heartbeat TTL is set to + 1
 HEARTBEAT_INTERVAL = 1
 
 # maximum number of times to .terminate() an alive process
@@ -38,42 +37,39 @@ TERMINATE_ATTEMPT_DELAY = 0.1
 
 class Runtime:
 
-    """Polaris runtime"""
+    """Polaris runtime.
+
+    Loads configuration, sets up logging, starts other processes.
+    Starts and periodically healthchecks other processes, if a child processes 
+    dies shutdowns the applicaton.    
+    Listens for control commands on UNIX socket.
+    """
 
     def __init__(self):
         self._procs_started = None
         self._control_socket = None
 
-        # this holds multiprocessing.Process() objects
-        # of the child processes spawned by the Runtime
+        # multiprocessing.Process() objects of the child processes spawned
         self._processes = []
 
         # shared memory client
         self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
 
-        # probe requests are put on this queue by Tracker
-        # to be consumed by Prober processes
-        #self._probe_request_queue = multiprocessing.Queue()
-
-        # processed probes are put on this queue by Prober processes to be
-        # consumed by Tracker
-        #self._probe_response_queue = multiprocessing.Queue()
-
     @staticmethod
     def load_configuration():        
-        """Load configuration from file system"""
+        """Load configuration from files"""
         LOG.debug('loading Polaris health configuration')
 
-        ### set config.BASE['INSTALL_PREFIX']
+        ### set config.BASE['INSTALL_PREFIX'] from POLARIS_INSTALL_PREFIX env
         try:
-            config.BASE['INSTALL_PREFIX'] = \
-                os.environ['POLARIS_INSTALL_PREFIX']
+                config.BASE['INSTALL_PREFIX'] = \
+                    os.environ['POLARIS_INSTALL_PREFIX']
         except KeyError:
             log_msg = 'POLARIS_INSTALL_PREFIX env is not set'
             LOG.error(log_msg)
             raise Error(log_msg)
 
-        ### load BASE configuration ###
+        ### optionally load BASE configuration ###
         base_config_file = os.path.join(
             config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-health.yaml')
         if os.path.isfile(base_config_file):
@@ -110,7 +106,7 @@ class Runtime:
             with open(lb_config_file) as fp:
                 config.LB = yaml.load(fp)
 
-        ### load TOPOLOGY_MAP configuration ###
+        ### optionally load TOPOLOGY_MAP configuration ###
         topology_config_file = os.path.join(
             config.BASE['INSTALL_PREFIX'], 'etc', 'polaris-topology.yaml')
         if os.path.isfile(topology_config_file):
@@ -120,12 +116,25 @@ class Runtime:
             if topology_config:
                 config.TOPOLOGY_MAP = topology.config_to_map(topology_config)
 
-    def start(self):
-        """Start Polaris health
+    def start(self, debug=False):
+        """Start Polaris health.
 
-        Configuration must be loaded prior to calling this
+        polaris_health.config must be loaded prior to calling this.
+
+        If debug is True logging level is set to DEBUG with logs 
+        sent to stdout.
         """
+        # setup logging
+        if debug:
+            util.log.setup_debug()    
+        else:
+            util.log.setup()
+
         LOG.info('starting Polaris health')
+
+        # FIXME defining probe queues in __init__() causes Prober process
+        # to fail with EOFError raised when attempting to .get() 
+        # from the request queue
 
         # probe requests are put on this queue by Tracker
         # to be consumed by Prober processes
@@ -135,9 +144,7 @@ class Runtime:
         # consumed by Tracker
         self._probe_response_queue = multiprocessing.Queue()
 
-        # instantiate the Tracker first, this will validate the configuration
-        # and throw an exception if there is a problem with it,
-        # while we're still single threaded
+        # instantiate Tracker, this will also validate the configuration
         p = tracker.Tracker(probe_request_queue=self._probe_request_queue,
                             probe_response_queue=self._probe_response_queue)
         self._processes.append(p)
@@ -151,20 +158,20 @@ class Runtime:
         # initialize control socket
         self._init_control_socket()
 
-        # create pid file
-        self._create_pid_file()
+        # write pid file
+        self._write_pid_file()
 
         # start all the processes
         for p in self._processes:
             p.start()
 
-        # Avoid code that migth throw an exceptions between child procs
-        # started/exited markers, if an exception must be included, the 
-        # handling code must terminate all the child processes
-        # (self._terminate_child_procs()) prior to exiting to avoid zombies
+        # If a code between child procs started/exited markers is expected to
+        # throw an exception, all the child processes must be terminated
+        # (call self._terminate_child_procs()) prior to exiting 
+        # to avoid zombies
 
         ###########################
-        # Child processes started # 
+        # child processes started # 
         ###########################
 
         # note the total number of child processes started 
@@ -182,7 +189,7 @@ class Runtime:
             p.join()
 
         ##########################
-        # Child processes exited #
+        # child processes exited #
         ##########################
 
         # clean up the control socket
@@ -190,25 +197,26 @@ class Runtime:
             self._control_socket.close()
         self._delete_control_socket_file()
 
-        # delete pid file
+        # delete the pid file
         self._delete_pid_file()
 
         LOG.info('Polaris health finished execution')
 
     def _control_loop(self):
         """Accept and processes incoming connections on the control socket,
-        verify that all the processes spawned by the Runtime are alive,
+        verify that all the processes spawned by the Runtime are alive
+        (terminate the app if one of the child processes dies),
         push heartbeat into the shared memory
         """
-        # set last time so that "if t_now - t_last >= HEALTHCHECK_INTERVAL"
+        # setting t_last so that "if t_now - t_last >= HEALTHCHECK_INTERVAL"
         # below evalutes to True on the first run and a heartbeat is written
         t_last = time.time() - HEARTBEAT_INTERVAL - 1
 
         while True:
-
-            ### process control connections
+            ### process control connections ###
             try:
                 conn, client_addr = self._control_socket.accept()
+            # e.g. timeout
             except OSError:
                 pass
             else:
@@ -220,11 +228,9 @@ class Runtime:
                                .format(e.__class__.__name__, e))
                     LOG.warning(log_msg)
                                
-            ### health check the Runtime
-            # count the number of processes alive
+            ### health check the child procs ###
             alive = 0
             for p in self._processes:
-                LOG.info('healthchecking %r' % p)
                 if p.is_alive():
                     alive += 1
 
@@ -234,7 +240,8 @@ class Runtime:
                     'no child processes are alive, exiting the control loop')
                 return
 
-            # some child procs crashed
+            # one or more child proc(s) exited
+            # terminate the remaining procs and and exit the loop
             if alive != self._procs_started:
                 log_msg = ('processes started: {} processes alive: {}'
                            .format(self._procs_started, alive))
@@ -242,23 +249,26 @@ class Runtime:
                 self._terminate_child_procs()
                 return
 
-            ### heartbeat
+            ### push heartbeat ###
             t_now = time.time()
             if t_now - t_last >= HEARTBEAT_INTERVAL:
-
                 obj = { 'timestamp': time.time() }
-
                 val = self._sm.set(config.BASE['SHARED_MEM_HEARTBEAT_KEY'],
                                    json.dumps(obj), 
                                    HEARTBEAT_INTERVAL + 1)
                 if val is not True:
                     log_msg = 'failed to write heartbeat to the shared memory'
                     LOG.error(log_msg)
+                    self._terminate_child_procs()
+                    return
 
                 t_last = t_now
 
     def _process_control_connection(self, conn):
-        """Process connections on control socket"""
+        """Process a connection on the control socket.
+
+        Receive and action commands.
+        """
         data = conn.recv(CONTROL_SOCKET_RECV_BUFF_SIZE)
         if data:
             cmd = data.decode()
@@ -268,17 +278,19 @@ class Runtime:
             elif cmd == 'stop':
                 self._terminate_child_procs()
             else:
-                LOG.warning('unknown control socket command "{}"'
+                LOG.warning('unknown control socket command received "{}"'
                             .format(cmd))
 
         conn.close()
 
     def _terminate_child_procs(self):
-        """Terminate all processes spawned by the Runtime
+        """Terminate all the child procs.
 
         It has been observed that sometimes a process does not exit
         on .terminate(), we attempt to .terminate() it several times.
         """
+        LOG.info('terminating {} processes...'.format(len(self._processes)))
+ 
         i = 0
         while i < MAX_TERMINATE_ATTEMPTS:
             i += 1
@@ -312,15 +324,13 @@ class Runtime:
                 except OSError:
                     pass
 
-    def _create_pid_file(self):
+    def _write_pid_file(self):
         """Create file containing the PID of the Runtime process"""
-        LOG.debug('writting {}'.format(config.BASE['PID_FILE']))
-
         try:
             with open(config.BASE['PID_FILE'], 'w') as fh:
                 fh.write(str(os.getpid()))
         except OSError as e:
-            log_msg = ('unable to create pid file {} - {} {}'
+            log_msg = ('unable to write the pid file {} - {} {}'
                        .format(config.BASE['PID_FILE'],
                                e.__class__.__name__, e))
             LOG.error(log_msg)
@@ -328,7 +338,6 @@ class Runtime:
 
     def _delete_pid_file(self):
         """Delete Runtime process PID file"""
-        LOG.debug('removing {}'.format(config.BASE['PID_FILE']))
         try:
             os.remove(config.BASE['PID_FILE'])
         except OSError as e:
@@ -339,21 +348,17 @@ class Runtime:
             raise Error(log_msg)
 
     def _init_control_socket(self):
-        """Initialize control socket
+        """Initialize the control socket.
 
         self._control_socket is created and bound 
         to config.BASE['CONTROL_SOCKET_FILE']
         """
-        LOG.debug('initializing control socket')
-
-        # make sure socket file does not exist
+        # make sure the socket file does not exist
         self._delete_control_socket_file()
 
         self._control_socket = socket.socket(socket.AF_UNIX,
                                              socket.SOCK_STREAM)
-
-        # set a timeout on the control socket 
-        # so we don't eat CPU in the control loop
+        # set a timeout on the socket so we don't eat CPU in the control loop
         self._control_socket.settimeout(CONTROL_SOCKET_TIMEOUT)
 
         try:
@@ -365,7 +370,7 @@ class Runtime:
             LOG.error(log_msg)
             raise Error(log_msg)
 
-        # listen on the socket for incoming control connections
+        # listen on the socket for incoming connections
         self._control_socket.listen(1)
 
     def _delete_control_socket_file(self):
@@ -380,7 +385,6 @@ class Runtime:
                 LOG.error(log_msg)
 
     def _sigterm_handler(self, signo, stack_frame):
-        LOG.info('received sig {}, terminating {} processes...'.format(
-                 signo, len(self._processes)))
+        LOG.info('received sig {}'.format(signo))
         self._terminate_child_procs()
 
