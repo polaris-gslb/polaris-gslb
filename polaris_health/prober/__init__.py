@@ -87,17 +87,11 @@ class Prober(multiprocessing.Process):
 
     def run(self):
         while True:
-            try:
-                # grab the next Probe() from the queue 
-                probe = self.probe_request_queue.get()
-            except Exception as e:
-                LOG.error('prober crashed %s %s' % (e.__class__.__name__, e))
-                import time; time.sleep(5)
-                continue
+            probe = self.probe_request_queue.get()
+           
+            # run the probe
+            probe.run()
 
-                # run the probe
-                probe.run()
-
-                # put the Probe() on the response queue
-                self.probe_response_queue.put(probe)
+            # put the Probe() on the response queue
+            self.probe_response_queue.put(probe)
 

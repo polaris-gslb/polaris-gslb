@@ -38,21 +38,9 @@ def check_health():
 
     obj = json.loads(hb)
 
-    if time.time() - obj['timestamp'] > 21:
+    if time.time() - obj['timestamp'] > 5:
         STATUS.critical('aged timestamp: {}'.
                 format(time.asctime(time.gmtime(obj['timestamp']))))
-
-    if obj['child_procs_alive'] != obj['child_procs_total']:
-        STATUS.critical('child_procs_alive: {}, child_procs_total: {}'
-                .format(obj['child_procs_alive'], obj['child_procs_total']))
-
-    if obj['probe_req_queue_len'] > 100:
-        STATUS.critical(
-            'probe_req_queue_len: {}'.format(obj['probe_req_queue_len']))
-
-    if obj['probe_resp_queue_len'] > 100:
-        STATUS.critical(
-            'probe_resp_queue_len: {}'.format(obj['probe_resp_queue_len']))
 
 if __name__ == '__main__':
     check_health()

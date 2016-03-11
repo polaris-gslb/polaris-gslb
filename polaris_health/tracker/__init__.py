@@ -35,7 +35,7 @@ class Tracker(multiprocessing.Process):
             probe_response_queue: multiprocessing.Queue(),
                 queue to get processed probes from
 
-        """    
+        """
         super(Tracker, self).__init__()
 
         self.probe_request_queue = probe_request_queue
@@ -49,7 +49,6 @@ class Tracker(multiprocessing.Process):
 
     def run(self):
         """Main execution loop"""
-
         # init last_scan_state_time so we know when to run the first scan
         last_scan_state_time = time.time()
 
@@ -74,6 +73,7 @@ class Tracker(multiprocessing.Process):
             # if there was a state change in the last SCAN_STATE_INTERVAL,
             # push it to shared mem
             if time.time() - last_scan_state_time > SCAN_STATE_INTERVAL:
+
                 # update last scan state time
                 last_scan_state_time = time.time()
 
@@ -88,6 +88,7 @@ class Tracker(multiprocessing.Process):
                         log_msg = ('failed to write ppdns '
                                    'state to the shared memory')
                         LOG.error(log_msg)
+                        raise Error(log_msg)
 
                     # push generic form of the state
                     obj = util.instance_to_dict(self.state)
@@ -99,11 +100,12 @@ class Tracker(multiprocessing.Process):
                         log_msg = ('failed to write generic '
                                    'state to the shared memory')
                         LOG.error(log_msg)
-
+                        raise Error(log_msg)
+            
                     # reset state changed flag
                     self.state_changed = False
 
-                    LOG.debug('synced state, version to the shared memory')
+                    LOG.debug('synced state to the shared memory')
  
                 # iterate the state, issue new probe requests
                 self._scan_state()
