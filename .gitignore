@@ -1,9 +1,10 @@
 *.pyc
-__pycache__/
+__pycache__
 build
 dist
 *egg-info
 *.swp
 *.swo
 .DS_Store
+.cache
 

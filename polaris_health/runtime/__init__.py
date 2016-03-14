@@ -267,7 +267,7 @@ class Runtime:
     def _process_control_connection(self, conn):
         """Process a connection on the control socket.
 
-        Receive and action commands.
+        Receive and action a command.
         """
         data = conn.recv(CONTROL_SOCKET_RECV_BUFF_SIZE)
         if data:
