@@ -10,6 +10,7 @@ import memcache
 from polaris_health import config, state, util
 from polaris_health.prober import Probe
 
+
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
@@ -20,6 +21,7 @@ PROBE_RESPONSE_QUEUE_WAIT =  0.05 # 50 ms
 # how often to issue new probe requests and sync state to shared mem(but only
 # if state change occurred)
 SCAN_STATE_INTERVAL = 1 # 1s
+
 
 class Tracker(multiprocessing.Process):
 
@@ -34,7 +36,6 @@ class Tracker(multiprocessing.Process):
                 queue to put new probes on
             probe_response_queue: multiprocessing.Queue(),
                 queue to get processed probes from
-
         """
         super(Tracker, self).__init__()
 
@@ -53,7 +54,7 @@ class Tracker(multiprocessing.Process):
         last_scan_state_time = time.time()
 
         # Track whether status of any of the backend servers changed.
-        # If the state has changed we will push it to share _mem, but no more
+        # If the state has changed we will push it to shared mem, but no more
         # often than SCAN_STATE_INTERVAL
         self.state_changed = False
 
@@ -111,17 +112,18 @@ class Tracker(multiprocessing.Process):
                 self._scan_state()
 
     def _process_probe(self, probe):
-        """Process a probe, change the associated member status accordingly.
+        """Process probe, change the associated member status accordingly.
         
         args:
             probe: Probe() object
-
         """
         LOG.debug('received {}'.format(str(probe)))  
 
         # get a reference to the individual pool member 
         # based on pool_name and member_ip
-        member = self.state.pools[probe.pool_name].members[probe.member_ip]    
+        for member in self.state.pools[probe.pool_name].members:
+            if member.ip == probe.member_ip:
+                break
 
         # set member status attributes 
         member.status_reason = probe.status_reason
@@ -171,11 +173,10 @@ class Tracker(multiprocessing.Process):
         self._change_pool_last_status(self.state.pools[probe.pool_name])
 
     def _scan_state(self):
-        """Iterate over the health table, request health probes"""
+        """Iterate over the state, request health probes"""
         for pool_name in self.state.pools:
             pool = self.state.pools[pool_name]
-            for member_ip in pool.members:
-                member = pool.members[member_ip]
+            for member in pool.members:
                 # request probe if required
                 self._request_probe(pool, member)
 
