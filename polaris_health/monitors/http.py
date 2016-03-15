@@ -22,7 +22,7 @@ class HTTP(BaseMonitor):
     """HTTP monitor"""    
 
     def __init__(self, use_ssl=False, hostname=None, url_path='/', port=None,
-                 interval=10, timeout=2, retries=2):
+                 interval=10, timeout=5, retries=2):
         """
         args:
             use_ssl: bool, whether to use SSL

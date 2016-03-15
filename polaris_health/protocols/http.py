@@ -64,7 +64,7 @@ class HTTPRequest:
     """HTTP request"""    
 
     def __init__(self, ip, use_ssl=False, hostname=None, url_path='/', 
-                 port=None, timeout=2):
+                 port=None, timeout=5):
         """
         args:
             ip: string, ip address to connect to
