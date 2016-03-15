@@ -7,12 +7,14 @@ import re
 from polaris_health import ProtocolError
 from . import tcp
 
+
 __all__ = [ 'HTTPRequest' ]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
 UNVERIFIED_SSL_CONTEXT = ssl._create_unverified_context()
+
 
 class HTTPResponse:
 
@@ -30,7 +32,6 @@ class HTTPResponse:
 
         args:
             raw: bytes(), raw HTTP bytes received from a server
-
         """
         self.raw = raw.decode()
 
@@ -44,8 +45,10 @@ class HTTPResponse:
         # search for HTTP Status-Line in the beginning of the response
         m = self._STATUS_LINE_RE.search(self.raw[:512])
 
-        # if there is no match, we got a none-http response?
+        # if there is no match, we got a non-http response?
         if not m:
+            LOG.debug('Unable to find HTTP Status-Line in the response: {}'
+                      .format(self.raw[:512])) 
             raise ProtocolError(
                 'Unable to find HTTP Status-Line in the response')
 
@@ -54,6 +57,7 @@ class HTTPResponse:
         # no need to trap ValueError here
         self.status_code = int(m.group(1))
         self.status_reason = m.group(2)
+
 
 class HTTPRequest:
 
@@ -139,7 +143,7 @@ class HTTPRequest:
         tcp_sock.sendall(req_str.encode())
 
         # get response bytes
-        raw = tcp_sock.receive()
+        raw = tcp_sock.recv()
 
         # close socket
         tcp_sock.close()

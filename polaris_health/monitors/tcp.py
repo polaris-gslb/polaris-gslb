@@ -7,13 +7,14 @@ from polaris_health import Error, ProtocolError, MonitorFailed
 from polaris_health.protocols.tcp import TCPSocket
 from . import BaseMonitor
 
+
 __all__ = [ 'TCP' ]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
 # use up to this num of bytes from a response
-MAX_RESPONSE_BYTES = 512
+MAX_RESPONSE_BYTES = 1024
 
 # maximum allowed length of match_re parameter
 MAX_MATCH_RE_LEN = 128
@@ -21,12 +22,13 @@ MAX_MATCH_RE_LEN = 128
 # maximum allowed length of send_string parameter
 MAX_SEND_STRING_LEN = 256
 
+
 class TCP(BaseMonitor):
 
     """TCP monitor base"""
 
     def __init__(self, port, send_string=None, match_re=None,
-                 interval=10, timeout=2, retries=2):
+                 interval=10, timeout=5, retries=2):
         """
         args:
             port: int, port number
@@ -35,10 +37,12 @@ class TCP(BaseMonitor):
             match_re: string, a regular expression to search for in a response
 
             Other args as per BaseMonitor() spec
-
         """
         super(TCP, self).__init__(interval=interval, timeout=timeout,
                                       retries=retries)
+
+        # name to show in generic state export
+        self._name = 'tcp'
 
         ### port ###
         self.port = port
@@ -98,7 +102,6 @@ class TCP(BaseMonitor):
         raises:
             MonitorFailed() on a socket operation timeout/error or if failed
             match the regexp.
-
         """
         tcp_sock = TCPSocket(ip=dst_ip, port=self.port, timeout=self.timeout)
 
@@ -117,7 +120,7 @@ class TCP(BaseMonitor):
 
         # we have a regexp to match, read response, perform matching
         try:
-            response_bytes = tcp_sock.receive()
+            response_bytes = tcp_sock.recv()
         except ProtocolError as e:
             raise MonitorFailed(e)
         else:
@@ -129,5 +132,7 @@ class TCP(BaseMonitor):
             
             # match regexp
             if not self._match_re_compiled.search(response_text):
+                LOG.debug('failed to match the regexp in the response: {}'
+                          .format(response_text))
                 raise MonitorFailed('failed to match the reg exp')
 

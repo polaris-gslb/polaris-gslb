@@ -93,6 +93,7 @@ class Tracker(multiprocessing.Process):
 
                     # push generic form of the state
                     obj = util.instance_to_dict(self.state)
+                    # add epoch time timestampt to the object
                     obj['timestamp'] = time.time()
                     val = self._sm.set(
                         config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
