@@ -210,7 +210,7 @@ class Runtime:
         """
         # setting t_last so that "if t_now - t_last >= HEALTHCHECK_INTERVAL"
         # below evalutes to True on the first run and a heartbeat is written
-        t_last = time.time() - HEARTBEAT_INTERVAL - 1
+        t_last = time.monotonic() - HEARTBEAT_INTERVAL - 1
 
         while True:
             ### process control connections ###
@@ -250,7 +250,7 @@ class Runtime:
                 return
 
             ### push heartbeat ###
-            t_now = time.time()
+            t_now = time.monotonic()
             if t_now - t_last >= HEARTBEAT_INTERVAL:
                 obj = { 'timestamp': time.time() }
                 val = self._sm.set(config.BASE['SHARED_MEM_HEARTBEAT_KEY'],

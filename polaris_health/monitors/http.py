@@ -7,6 +7,7 @@ from polaris_health.protocols.tcp import TCPSocket
 from polaris_health.protocols.http import HTTPRequest
 from . import BaseMonitor
 
+
 __all__ = [ 'HTTP' ]
 
 LOG = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ LOG.addHandler(logging.NullHandler())
 
 MAX_URL_PATH_LEN = 256
 MAX_HOSTNAME_LEN = 256
+
 
 class HTTP(BaseMonitor):
 
@@ -31,11 +33,13 @@ class HTTP(BaseMonitor):
                 use_ssl is True)
 
             Other args as per BaseMonitor() spec
-
         """
         super(HTTP, self).__init__(interval=interval, timeout=timeout,
                                          retries=retries)
-        
+       
+        # name to show in generic state export
+        self._name = 'http'
+
         ### use_ssl ###
         self.use_ssl = use_ssl
 
