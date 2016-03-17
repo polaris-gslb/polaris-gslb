@@ -133,8 +133,8 @@ class HTTPRequest:
 
         # if using SSL wrap the socket
         if self.use_ssl:
-            tcp_sock.sock = UNVERIFIED_SSL_CONTEXT.wrap_socket(
-                tcp_sock.sock, server_hostname=self.hostname)
+            tcp_sock._sock = UNVERIFIED_SSL_CONTEXT.wrap_socket(
+                tcp_sock._sock, server_hostname=self.hostname)
 
         # connect
         tcp_sock.connect()

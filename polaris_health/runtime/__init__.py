@@ -138,21 +138,21 @@ class Runtime:
 
         # probe requests are put on this queue by Tracker
         # to be consumed by Prober processes
-        self._probe_request_queue = multiprocessing.Queue()
+        self._prober_requests = multiprocessing.Queue()
 
         # processed probes are put on this queue by Prober processes to be
         # consumed by Tracker
-        self._probe_response_queue = multiprocessing.Queue()
+        self._prober_responses = multiprocessing.Queue()
 
         # instantiate Tracker, this will also validate the configuration
-        p = tracker.Tracker(probe_request_queue=self._probe_request_queue,
-                            probe_response_queue=self._probe_response_queue)
+        p = tracker.Tracker(prober_requests=self._prober_requests,
+                            prober_responses=self._prober_responses)
         self._processes.append(p)
 
         # instantiate Probers
         for i in range(config.BASE['NUM_PROBERS']):
-            p = prober.Prober(probe_request_queue=self._probe_request_queue,
-                              probe_response_queue=self._probe_response_queue)
+            p = prober.ProberProcess(prober_requests=self._prober_requests,
+                                     prober_responses=self._prober_responses)
             self._processes.append(p)
 
         # initialize control socket
