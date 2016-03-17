@@ -8,7 +8,7 @@ import queue
 import memcache
 
 from polaris_health import config, state, util
-from polaris_health.prober import Probe
+from polaris_health.prober.probe import Probe
 
 
 LOG = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ LOG.addHandler(logging.NullHandler())
 
 # how long to wait(block) when reading from probe response queue
 # non-blocking will eat 100% cpu at low message rate
-PROBE_RESPONSE_QUEUE_WAIT =  0.05 # 50 ms
+PROBE_RESPONSES_QUEUE_WAIT =  0.05 # 50 ms
 
 # how often to issue new probe requests and sync state to shared mem(but only
 # if state change occurred)
@@ -29,18 +29,18 @@ class Tracker(multiprocessing.Process):
     shared memory.
     """
 
-    def __init__(self, probe_request_queue, probe_response_queue):
+    def __init__(self, prober_requests, prober_responses):
         """
         args:
-            probe_request_queue: multiprocessing.Queue(), 
+            prober_requests: multiprocessing.Queue(), 
                 queue to put new probes on
-            probe_response_queue: multiprocessing.Queue(),
+            prober_responses: multiprocessing.Queue(),
                 queue to get processed probes from
         """
         super(Tracker, self).__init__()
 
-        self.probe_request_queue = probe_request_queue
-        self.probe_response_queue = probe_response_queue
+        self.prober_requests = prober_requests
+        self.prober_responses = prober_responses
 
         # create health state table from the lb config
         self.state = state.State(config_obj=config.LB)
@@ -63,8 +63,8 @@ class Tracker(multiprocessing.Process):
             try:
                 # block with a small timeout,
                 # non-blocking will load cpu needlessly
-                probe = self.probe_response_queue.get(
-                    True, PROBE_RESPONSE_QUEUE_WAIT)
+                probe = self.prober_responses.get(
+                    block=True, timeout=PROBE_RESPONSES_QUEUE_WAIT)
             except queue.Empty: # nothing on the queue
                 pass
             else:
@@ -118,7 +118,7 @@ class Tracker(multiprocessing.Process):
         args:
             probe: Probe() object
         """
-        LOG.debug('received {}'.format(str(probe)))  
+        #LOG.debug('received {}'.format(str(probe)))  
 
         # get a reference to the individual pool member 
         # based on pool_name and member_ip
@@ -207,7 +207,7 @@ class Tracker(multiprocessing.Process):
                           member_ip=member.ip,
                           monitor=pool.monitor)
 
-            self.probe_request_queue.put(probe) 
+            self.prober_requests.put(probe) 
 
             # update the time when the probe was issued
             member.last_probe_issued_time = time.time()

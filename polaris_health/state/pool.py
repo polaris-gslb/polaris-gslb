@@ -392,7 +392,7 @@ class Pool:
                     # into the regional table
                     for i in range(member.weight):
                         dist_tables[member.region]['rotation'].append(
-                            member_ip)
+                            member.ip)
 
                     # increase the number of unique addresses in the table by 1
                     dist_tables[member.region]['num_unique_addrs'] += 1
