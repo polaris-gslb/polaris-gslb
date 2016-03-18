@@ -8,7 +8,7 @@ A simple, extendable Global Server Load Balancing(GSLB) solution, DNS-based traf
     * Topology(direct clients to the end-points in the same region/datacenter)
 * Parameterized(timeout, interval, retries etc.) health monitors:
     * TCP
-    * HTTP(S)
+    * HTTP
 * Up to 32 addresses returned in a response
 * Different ways to handle the "all-pool-members-down" situation(fallback):
     * return any configured end-points(ignore the health status) 
