@@ -8,6 +8,10 @@ import time
 
 import memcache
 
+MEMCACHED_HOSTNAME = '127.0.0.1'
+HEARTBEAT_KEY = 'polaris_health:heartbeat'
+PPDNS_STATE_KEY = 'polaris_health:state:ppdns'
+
 mc = memcache.Client(['127.0.0.1'])
 
 val = mc.get('polaris_health:generic_state')

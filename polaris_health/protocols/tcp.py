@@ -45,7 +45,7 @@ class TCPSocket:
             self._sock.connect((self.ip, self.port))
         except OSError as e:
             self._sock.close()
-            raise ProtocolError('caught "{} {}" during socket.connect()'
+            raise ProtocolError('{} {} during socket.connect()'
                                 .format(e.__class__.__name__, e))
         self._decrease_timeout(time.monotonic() - start_time)
 
@@ -61,7 +61,7 @@ class TCPSocket:
             self._sock.sendall(b)
         except OSError as e:
             self._sock.close()
-            raise ProtocolError('caught "{} {}" during socket.sendall()'
+            raise ProtocolError('{} {} during socket.sendall()'
                                 .format(e.__class__.__name__, e))
         self._decrease_timeout(time.monotonic() - start_time)
 
@@ -77,7 +77,7 @@ class TCPSocket:
             received = self._sock.recv(RECV_BUFF_SIZE)
         except OSError as e:
             self._sock.close()
-            raise ProtocolError('caught "{} {}" during socket.recv()'
+            raise ProtocolError('{} {} during socket.recv()'
                                 .format(e.__class__.__name__, e))
         self._decrease_timeout(time.monotonic() - start_time)
 

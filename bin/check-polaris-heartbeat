@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import json
+import time
+
+import memcache
+
+
+MEMCACHED_HOSTNAME = '127.0.0.1'
+HEARTBEAT_KEY = 'polaris_health:heartbeat'
+
+
+mc = memcache.Client([MEMCACHED_HOSTNAME])
+
+hb = mc.get(HEARTBEAT_KEY)
+if hb is None:
+    print('failed to retrieve heartbeat')
+    exit(1)
+
+obj = json.loads(hb)
+
+time_human = time.asctime(time.gmtime(obj['timestamp']))    
+if time.time() - obj['timestamp'] > 5:
+    print('aged timestamp: {}'.format(time_human))
+    exit(1)
+
+print('ok, timestamp is {}'.format(time_human))
+

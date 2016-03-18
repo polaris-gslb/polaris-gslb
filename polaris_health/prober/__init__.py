@@ -25,7 +25,7 @@ MAX_PROBER_THREADS = 500
 # how often to run the logic that terminates excessive threads
 CLEANUP_THREADS_INTERVAL = 30
 # at what number of excessive threads to begin to terminate them
-EXCESSIVE_THREADS_THRESHOLD = 20
+EXCESSIVE_THREADS_THRESHOLD = 25
 
 # counter updated by Prober threads showing how many of them 
 # are currently processing health probes
@@ -147,7 +147,7 @@ class ProberProcess(multiprocessing.Process):
             num_to_kill = len(self._threads) - self._max_busy_threads - 1
             LOG.debug('excessive threads detected, '
                       'total: {total} max busy: {max_busy}, '
-                      'terminating {num_to_kill} threads'
+                      'scheduling termination of {num_to_kill} threads'
                       .format(total=len(self._threads), 
                               max_busy=self._max_busy_threads,
                               num_to_kill=num_to_kill)) 
