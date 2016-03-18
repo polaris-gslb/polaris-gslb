@@ -6,14 +6,15 @@ import json
 import memcache
 
 from polaris_common import topology
-
 from polaris_pdns import config
 from .remotebackend import RemoteBackend
+
 
 __all__ = [ 'Polaris' ]
 
 # minimum number of seconds between syncing distribution state from shared mem 
 STATE_SYNC_INTERVAL = 1
+
 
 class Polaris(RemoteBackend):
     
@@ -46,7 +47,6 @@ class Polaris(RemoteBackend):
         """
         args:
             params: 'parameters' dict from PowerDNS JSON API request
-        
         """
         # sync(if required) state from the shared memory
         self._sync_state()
@@ -75,16 +75,14 @@ class Polaris(RemoteBackend):
     def do_getDomainMetadata(self, params):
         """PDNS seems to ask for this quite a bit,
         respond with result:false
-
         """
         self.result = False
 
     def _any_response(self, params):
-        """Generate a response to ANY/A query
+        """Generate a response to ANY/A query.
 
         See polaris_health.state to_dist_dict() methods for the distribution
         state implementation details.
-
         """
         qname = params['qname'].lower()
 
@@ -169,9 +167,7 @@ class Polaris(RemoteBackend):
                 dist_table['index'] = 0
 
     def _soa_response(self, params):
-        """Generate a response to a SOA query
-
-        """
+        """Generate a response to a SOA query."""
         # if pool is DOWN and fallback is set to "refuse", refuse SOA queries
         # when both SOA any ANY results in False the pdns will produce a REFUSE
         qname = params['qname'].lower()
@@ -200,8 +196,7 @@ class Polaris(RemoteBackend):
                         ttl=60)
 
     def _sync_state(self):
-        """Synchronize the local distribution state from shared memory
-
+        """Synchronize the local distribution state from shared memory.
         """
         t = time.time()
 

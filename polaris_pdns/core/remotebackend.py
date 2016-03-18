@@ -7,7 +7,9 @@ import time
 
 from polaris_pdns import config
 
+
 __all__ = [ 'RemoteBackend' ]
+
 
 class RemoteBackend:
 
@@ -147,7 +149,6 @@ class RemoteBackend:
 
         You can optionally add 'log' array, each line in this array will be 
         logged in PowerDNS."
-
         """
         obj = {}
         obj['result'] = self.result

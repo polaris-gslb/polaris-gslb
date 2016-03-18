@@ -14,7 +14,7 @@
 POLARIS_INSTALL_PREFIX=/opt/polaris
 export POLARIS_INSTALL_PREFIX
 
-POLARIS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/polaris-health-control"
+POLARIS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/phealth-control"
 
 doControl()
 {

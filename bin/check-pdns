@@ -5,34 +5,16 @@ import subprocess
 
 import memcache
 
+
 PDNS_CONTROL = '/usr/local/bin/pdns_control'
 
-class Status():
 
-    def __init__(self):
-        pass
+ret_code = subprocess.call([PDNS_CONTROL, 'status'], 
+                           stderr=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL)
+if ret_code != 0:
+    print('pdns is not running')
+    exit(1)
 
-    def ok(self, msg):
-        print('OK: {}'.format(msg))
-
-    def major(self, msg):
-        print('MAJOR: {}'.format(msg))
-        exit(1)
-
-    def critical(self, msg):
-        print('CRITICAL: {}'.format(msg))
-        exit(2)
-
-STATUS = Status()
-
-def check_pdns():
-    ret_code = subprocess.call([PDNS_CONTROL, 'status'], 
-                               stderr=subprocess.DEVNULL,
-                               stdout=subprocess.DEVNULL)
-    if ret_code != 0:
-        STATUS.critical('pdns is not running')
-
-if __name__ == '__main__':
-    check_pdns()
-    STATUS.ok('all checks passed')
+print('all checks passed')
 

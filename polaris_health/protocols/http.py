@@ -31,9 +31,9 @@ class HTTPResponse:
         self.status_reason
 
         args:
-            raw: bytes(), raw HTTP bytes received from a server
+            raw: string, decoded bytes received from a server
         """
-        self.raw = raw.decode()
+        self.raw = raw
 
         # set self.status_code, self.status_reason
         self._parse_status()
@@ -43,14 +43,13 @@ class HTTPResponse:
         status_reason
         """
         # search for HTTP Status-Line in the beginning of the response
-        m = self._STATUS_LINE_RE.search(self.raw[:512])
+        m = self._STATUS_LINE_RE.search(self.raw[:128])
 
         # if there is no match, we got a non-http response?
         if not m:
-            LOG.debug('Unable to find HTTP Status-Line in the response: {}'
-                      .format(self.raw[:512])) 
-            raise ProtocolError(
-                'Unable to find HTTP Status-Line in the response')
+            raise ProtocolError('Unable to find HTTP Status-Line '
+                                'in(up to 512 chars): {}'
+                                .format(self.raw[:512]))
 
         # convert status to integer
         # as the _STATUS_LINE_RE regexp is matching \d+ 
@@ -139,14 +138,35 @@ class HTTPRequest:
         # connect
         tcp_sock.connect()
         
-        # send bytes
+        # send request
         tcp_sock.sendall(req_str.encode())
 
-        # get response bytes
-        raw = tcp_sock.recv()
+        # continuously read from the socket until either Status-Line is found,
+        # a timeout occurred or remote end closed the conection
+        response_string = ''
+        while True:
+            try:
+                recv_bytes = tcp_sock.recv()
+            except ProtocolError as e:
+                log_msg = ('failed to find Status-Line within the timeout, '
+                           'got {error}, '
+                           'response(up to 512 chars): {response_string}'
+                           .format(error=e, 
+                                   response_string=response_string[:512]))
+                raise ProtocolError(log_msg)
 
-        # close socket
-        tcp_sock.close()
-
-        return HTTPResponse(raw)
+            # remote side closed connection
+            if recv_bytes == b'':
+                tcp_sock.close()
+                raise ProtocolError('remote closed the connection, '
+                                    'failed to find Status-Line in the '
+                                    'response(up to 512 chars): {}'
+                                    .format(response_string[:128]))
+            else:
+                # match in the data received so far
+                response_string += recv_bytes.decode(errors='ignore')
+                if HTTPResponse._STATUS_LINE_RE.search(response_string[:128]):
+                    # found Status-Line
+                    tcp_sock.close()
+                    return HTTPResponse(response_string)
 

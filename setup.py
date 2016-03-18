@@ -1,7 +1,10 @@
 #-*- coding: utf-8 -*-
 
-"""Polaris setup"""
+"""Polaris setup
 
+To install to a different folder set POLARIS_INSTALL_PREFIX env 
+before running.
+"""
 import os
 import sys
 import inspect
@@ -60,6 +63,11 @@ def main():
     for dirname in [ 'etc', 'bin' ]:
         copy_files(os.path.join(pwd, dirname), 
                    os.path.join(install_prefix, dirname))
+
+    # write /etc/default/polaris
+    with open(install_prefix, 'w') as f:
+        f.write('export POLARIS_INSTALL_PREFIX={}'
+                .format(install_prefix))
 
 
 def copy_files(src_dir, dst_dir):

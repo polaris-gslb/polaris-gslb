@@ -13,9 +13,6 @@ __all__ = [ 'TCP' ]
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
-# use up to this num of bytes from a response
-MAX_RESPONSE_BYTES = 1024
-
 # maximum allowed length of match_re parameter
 MAX_MATCH_RE_LEN = 128
 
@@ -42,7 +39,7 @@ class TCP(BaseMonitor):
                                       retries=retries)
 
         # name to show in generic state export
-        self._name = 'tcp'
+        self.name = 'tcp'
 
         ### port ###
         self.port = port
@@ -118,21 +115,34 @@ class TCP(BaseMonitor):
             tcp_sock.close()
             return
 
-        # we have a regexp to match, read response, perform matching
-        try:
-            response_bytes = tcp_sock.recv()
-        except ProtocolError as e:
-            raise MonitorFailed(e)
-        else:
-            # close the socket
-            tcp_sock.close()
+        # we have a regexp to match
+        # continuously read from the socket and perform matching until either
+        # a match is found, a timeout occurred or remote end 
+        # closed the conection
+        response_string = ''
+        while True:
+            try:
+                recv_bytes = tcp_sock.recv()
+            except ProtocolError as e:
+                log_msg = ('failed to match the regexp within the timeout, '
+                           'got {error}, '
+                           'response(up to 512 chars): {response_string}'
+                           .format(error=e,
+                                   response_string=response_string[:512]))
+                raise MonitorFailed(log_msg)
 
-            # decode up to MAX_RESPONSE_BYTES
-            response_text = response_bytes[:MAX_RESPONSE_BYTES].decode()
-            
-            # match regexp
-            if not self._match_re_compiled.search(response_text):
-                LOG.debug('failed to match the regexp in the response: {}'
-                          .format(response_text))
-                raise MonitorFailed('failed to match the reg exp')
+            # remote side closed connection
+            if recv_bytes == b'':
+                tcp_sock.close()
+                raise MonitorFailed('remote closed the connection, '
+                                    'failed to match the regexp in the '
+                                    'response(up to 512 chars): {}'
+                                    .format(response_string[:512]))
+        
+            # received data
+            else:
+                response_string += recv_bytes.decode(errors='ignore')
+                if self._match_re_compiled.search(response_string):
+                    tcp_sock.close()
+                    return
 

@@ -38,7 +38,7 @@ class HTTP(BaseMonitor):
                                          retries=retries)
        
         # name to show in generic state export
-        self._name = 'http'
+        self.name = 'http'
 
         ### use_ssl ###
         self.use_ssl = use_ssl
