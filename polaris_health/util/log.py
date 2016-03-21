@@ -5,6 +5,7 @@ import logging.config
 
 from polaris_health import Error, config
 
+
 __all__ = [ 'setup', 'setup_debug' ]
 
 LOG = logging.getLogger(__name__)

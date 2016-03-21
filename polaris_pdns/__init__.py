@@ -13,7 +13,7 @@ __all__ = [ 'main', 'load_configuration' ]
 
 
 def main():
-    """Config must be loaded prior to calling this."""    
+    """Config must be loaded prior to calling this."""   
     Polaris().run()
 
 

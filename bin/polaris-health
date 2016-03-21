@@ -11,10 +11,9 @@
 # Description:       Polaris Health
 ### END INIT INFO
 
-POLARIS_INSTALL_PREFIX=/opt/polaris
-export POLARIS_INSTALL_PREFIX
+. /etc/default/polaris
 
-POLARIS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/phealth-control"
+POLARIS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/polaris-health-control"
 
 doControl()
 {
@@ -87,7 +86,7 @@ case "$1" in
             exit 1
         fi
 
-        doControl stop 
+        doControl stop  
         sleep 2
         doControl start
         sleep 2
@@ -101,8 +100,52 @@ case "$1" in
         fi
     ;;
 
+    get-generic-state)
+        doControl get-generic-state ; EC=$?
+        if test "$EC" != "0"
+        then    
+            echo "failed to get!"
+            exit 1
+        else
+            echo "$ret"
+        fi
+    ;;
+
+    get-ppdns-state)
+        doControl get-ppdns-state ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "failed to get!"
+            exit 1
+        else
+            echo "$ret"
+        fi
+    ;;
+
+    get-heartbeat)
+        doControl get-heartbeat ; EC=$?
+        if test "$EC" != "0"
+        then 
+            echo "failed to get!"
+            exit 1
+        else
+            echo "$ret"
+        fi
+    ;;
+
+    check-heartbeat)
+        doControl check-heartbeat ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "failed!"
+            exit 1
+        else 
+            echo "ok"
+        fi
+    ;;
+
     *)
-    echo polaris-health [status\|start\|start-debug\|stop\|restart]
+    echo polaris-health [status\|start\|start-debug\|stop\|restart\|get-generic-state\|get-ppdns-state\|get-heartbeat\|check-heartbeat]
     ;;
 
 esac

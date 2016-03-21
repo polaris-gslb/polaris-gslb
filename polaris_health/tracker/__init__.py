@@ -118,7 +118,7 @@ class Tracker(multiprocessing.Process):
         args:
             probe: Probe() object
         """
-        #LOG.debug('received {}'.format(str(probe)))  
+        LOG.debug('received {}'.format(str(probe)))  
 
         # get a reference to the individual pool member 
         # based on pool_name and member_ip

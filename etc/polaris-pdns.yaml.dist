@@ -9,5 +9,5 @@
 #
 # setting to "false" will improve the backend performance
 #
-# LOG: true
+# LOG: false
 
