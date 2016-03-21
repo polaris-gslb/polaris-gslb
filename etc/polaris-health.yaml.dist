@@ -1,7 +1,7 @@
 ################################
-# number of prober processes to run
+# number of prober processes to run, each process will support up to 500 worker threads
 #
-# NUM_PROBERS: 2
+# NUM_PROBERS: 1
 
 ################################
 # log level, one of "none"(disables logging), "info", "debug", "warning", "error"

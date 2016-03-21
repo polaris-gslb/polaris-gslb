@@ -11,17 +11,15 @@ pools:
         lb_method: twrr 
         fallback: any
         members:
-            - ip: 10.1.1.1
-              name: www1-dc1
-              weight: 1
-
-            - ip: 172.16.1.1
-              name: www2-dc2
-              weight: 1
-
-            - ip: 172.16.1.2
-              name: www3-dc2
-              weight: 1
+        - ip: 10.1.1.1
+          name: www1-dc1
+          weight: 1
+        - ip: 172.16.1.1
+          name: www2-dc2
+          weight: 1
+        - ip: 172.16.1.2
+          name: www3-dc2
+          weight: 1
 
 globalnames:
     www.example.com:

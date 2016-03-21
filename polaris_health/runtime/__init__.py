@@ -12,8 +12,8 @@ import memcache
 import yaml
 
 from polaris_common import topology
-from polaris_health import Error, config, util, prober, tracker
-
+from polaris_health import Error, config, prober, tracker
+import polaris_health.util.log
 
 __all__ = [ 'Runtime' ]
 
@@ -126,9 +126,9 @@ class Runtime:
         """
         # setup logging
         if debug:
-            util.log.setup_debug()    
+            polaris_health.util.log.setup_debug()    
         else:
-            util.log.setup()
+            polaris_health.util.log.setup()
 
         LOG.info('starting Polaris health')
 
@@ -271,7 +271,8 @@ class Runtime:
         """
         data = conn.recv(CONTROL_SOCKET_RECV_BUFF_SIZE)
         if data:
-            cmd = data.decode()
+            cmd = data.decode(errors='ignore')
+            LOG.debug('received "{}" command'.format(cmd))
 
             if cmd == 'ping':
                 conn.sendall('pong'.encode())

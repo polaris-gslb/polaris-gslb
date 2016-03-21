@@ -31,7 +31,7 @@ def main():
         version=VERSION,
         author='Anton Gavrik',    
         name='polaris-gslb',
-        description=('A simple, extendable Global Server Load Balancing(GSLB) '
+        description=('An extendable Global Server Load Balancing(GSLB) '
                      'solution, DNS-based traffic manager.'),
         packages = setuptools.find_packages('.'),
         install_requires=[
@@ -65,8 +65,8 @@ def main():
                    os.path.join(install_prefix, dirname))
 
     # write /etc/default/polaris
-    with open(install_prefix, 'w') as f:
-        f.write('export POLARIS_INSTALL_PREFIX={}'
+    with open(os.path.join(os.sep, 'etc', 'default', 'polaris'), 'w') as f:
+        f.write('export POLARIS_INSTALL_PREFIX={}\n'
                 .format(install_prefix))
 
 

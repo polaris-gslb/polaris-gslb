@@ -1,9 +1,8 @@
 #!/bin/sh
 
-POLARIS_INSTALL_PREFIX=/opt/polaris
-export POLARIS_INSTALL_PREFIX
+. /etc/default/polaris
 
-POLARIS_PDNS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/ppdns-control"
+POLARIS_PDNS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/polaris-pdns-control"
 
 $POLARIS_PDNS_CONTROL_CMD
 
