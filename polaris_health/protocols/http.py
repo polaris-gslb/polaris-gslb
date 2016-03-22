@@ -155,9 +155,8 @@ class HTTPRequest:
                                    response_string=response_string[:512]))
                 raise ProtocolError(log_msg)
 
-            # remote side closed connection
+            # remote side closed connection, no need to call sock.close()
             if recv_bytes == b'':
-                tcp_sock.close()
                 raise ProtocolError('remote closed the connection, '
                                     'failed to find Status-Line in the '
                                     'response(up to 512 chars): {}'
