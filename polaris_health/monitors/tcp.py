@@ -131,9 +131,8 @@ class TCP(BaseMonitor):
                                    response_string=response_string[:512]))
                 raise MonitorFailed(log_msg)
 
-            # remote side closed connection
+            # remote side closed connection, no need to call sock.close()
             if recv_bytes == b'':
-                tcp_sock.close()
                 raise MonitorFailed('remote closed the connection, '
                                     'failed to match the regexp in the '
                                     'response(up to 512 chars): {}'

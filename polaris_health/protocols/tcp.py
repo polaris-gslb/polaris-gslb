@@ -85,10 +85,16 @@ class TCPSocket:
 
     def close(self):
         """Shut down and close connected self._sock"""
-        # shutdown and close the socket
-        self._sock.shutdown(2) # SHUT_RDWR http://linux.die.net/man/2/shutdown
-        self._sock.close()
-
+        # protect against crashing when called on a non-connected socket
+        try:
+            # SHUT_RDWR http://linux.die.net/man/2/shutdown
+            self._sock.shutdown(2)
+            self._sock.close()
+        except OSError as e:
+            log_msg = ('got {} {} when shutting down and closing the socket'
+                      .format(e.__class__.__name__, e))
+            LOG.warning(log_msg)
+            
     def settimeout(self, timeout):
         """Set timeout on the socket"""
         self._sock.settimeout(timeout)
