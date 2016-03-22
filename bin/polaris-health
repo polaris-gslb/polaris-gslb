@@ -17,12 +17,12 @@ POLARIS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/polaris-health-control"
 
 doControl()
 {
-    ret=$($POLARIS_CONTROL_CMD $1 2>/dev/null)
+    ret=$($POLARIS_CONTROL_CMD $1)
 }
 
 case "$1" in
     status)
-        doControl ping ; EC=$?
+        doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
         then 
             echo "not running"
@@ -36,7 +36,7 @@ case "$1" in
         echo -n "Starting Polaris Health... "
 
         # ensure polaris is not already running
-        doControl ping ; EC=$?
+        doControl ping 2>/dev/null ; EC=$?
         if test "$EC" = "0"
         then
             echo "aborted, already running!"
@@ -64,7 +64,7 @@ case "$1" in
         echo -n "Stopping Polaris Health... "
         
         # ensure polaris is running
-        doControl ping ; EC=$?
+        doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
         then
             echo "aborted, not running!"
@@ -79,7 +79,7 @@ case "$1" in
         echo -n "Restarting Polaris Health... "
 
         # ensure polaris is running
-        doControl ping ; EC=$?
+        doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
         then
             echo "aborted, not running!"
@@ -90,7 +90,7 @@ case "$1" in
         sleep 2
         doControl start
         sleep 2
-        doControl ping ; EC=$?
+        doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
         then
             echo "failed to start!"
@@ -105,4 +105,3 @@ case "$1" in
     ;;
 
 esac
-
