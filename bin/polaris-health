@@ -100,52 +100,8 @@ case "$1" in
         fi
     ;;
 
-    get-generic-state)
-        doControl get-generic-state ; EC=$?
-        if test "$EC" != "0"
-        then    
-            echo "failed to get!"
-            exit 1
-        else
-            echo "$ret"
-        fi
-    ;;
-
-    get-ppdns-state)
-        doControl get-ppdns-state ; EC=$?
-        if test "$EC" != "0"
-        then
-            echo "failed to get!"
-            exit 1
-        else
-            echo "$ret"
-        fi
-    ;;
-
-    get-heartbeat)
-        doControl get-heartbeat ; EC=$?
-        if test "$EC" != "0"
-        then 
-            echo "failed to get!"
-            exit 1
-        else
-            echo "$ret"
-        fi
-    ;;
-
-    check-heartbeat)
-        doControl check-heartbeat ; EC=$?
-        if test "$EC" != "0"
-        then
-            echo "failed!"
-            exit 1
-        else 
-            echo "ok"
-        fi
-    ;;
-
     *)
-    echo polaris-health [status\|start\|start-debug\|stop\|restart\|get-generic-state\|get-ppdns-state\|get-heartbeat\|check-heartbeat]
+    echo polaris-health [status\|start\|start-debug\|stop\|restart]
     ;;
 
 esac
