@@ -3,11 +3,7 @@
 
 import argparse
 import socket
-import os
-import time
-import json
 
-import memcache
 import daemon
 
 from  polaris_health import config, runtime
@@ -26,10 +22,6 @@ def main():
                             'start',
                             'start-debug',
                             'stop',
-                            'get-generic-state',
-                            'get-ppdns-state',
-                            'get-heartbeat',
-                            'check-heartbeat'
                             ]) 
     opts = parser.parse_args()
 
@@ -44,8 +36,6 @@ class PolarisHealthControl:
     def __init__(self):
         # load polaris_health.config
         runtime.Runtime.load_configuration()
-
-        self._mc = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
 
     def ping(self):
         self._send_control_sock_cmd('ping') == 'pong'
@@ -73,32 +63,6 @@ class PolarisHealthControl:
 
         self._send_control_sock_cmd('stop')
 
-    def get_generic_state(self):
-        """Get generic form of the state"""
-        val = self._mc_get(config.BASE['SHARED_MEM_GENERIC_STATE_KEY'])
-        print(json.dumps(val, indent=4))
-
-    def get_ppdns_state(self):
-        """Get ppdns form of the state"""
-        val = self._mc_get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
-        print(json.dumps(val, indent=4))
-
-    def get_heartbeat(self):
-        """Get Runtime's heartbeat"""
-        val = self._mc_get(config.BASE['SHARED_MEM_HEARTBEAT_KEY'])
-        obj = json.loads(val)
-        human = time.asctime(time.gmtime(obj['timestamp']))
-        print('timestamp: {} human readable: {}'
-              .format(obj['timestamp'], human))
-
-    def check_heartbeat(self):
-        """Ensure the heartbeat is valid"""
-        val = self._mc_get(config.BASE['SHARED_MEM_HEARTBEAT_KEY'])
-        obj = json.loads(val)
-
-        if time.time() - obj['timestamp'] > 5:
-            raise Exception('aged timestamp: {}'.format(time_human))
-
     def _is_running(self):
         try:
             if self._send_control_sock_cmd('ping') == 'pong':
@@ -116,12 +80,6 @@ class PolarisHealthControl:
         resp = sock.recv(CONTROL_SOCKET_RECV_BUFF_SIZE).decode()
         sock.close()
         return resp
-
-    def _mc_get(self, key):    
-        val = self._mc.get(key)
-        if val is None:
-            raise Exception('memcached get {} failed'.format(key))
-        return val     
 
 
 if __name__ == '__main__':
