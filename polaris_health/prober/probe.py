@@ -2,6 +2,9 @@
 
 import logging
 import time
+import sys
+import io
+import traceback
 
 from polaris_health import MonitorFailed
 
@@ -47,15 +50,16 @@ class Probe(object):
             self.status = False
             self.status_reason =  str(e)
             self.status_time = time.time()
-
-            #LOG.debug('{} failed'.format(str(self)))
         
         # protect the app from crashing if a monitor crashes
         except Exception as e:
+            # get traceback
+            fo = io.StringIO()
+            traceback.print_exception(*sys.exc_info(), limit=None, file=fo)
             self.status = False
             self.status_reason =  str(e)
             self.status_time = time.time()
-            LOG.error('{} crashed'.format(str(self)))
+            LOG.error('{} crashed, tb: {}'.format(str(self), fo.getvalue()))
 
         # monitor passed
         else:

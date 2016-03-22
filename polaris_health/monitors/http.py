@@ -96,7 +96,7 @@ class HTTP(BaseMonitor):
                               hostname=self.hostname, 
                               url_path=self.url_path,
                               timeout=self.timeout)
-
+        
         try:
             response = request.get()
         except ProtocolError as e:
