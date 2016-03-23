@@ -34,6 +34,9 @@ MAX_TERMINATE_ATTEMPTS = 5
 # delay between calling .terminate()
 TERMINATE_ATTEMPT_DELAY = 0.1
 
+# socket timeout on memcache client
+SHARED_MEM_SOCKET_TIMEOUT = 0.25
+
 
 class Runtime:
 
@@ -52,8 +55,11 @@ class Runtime:
         # multiprocessing.Process() objects of the child processes spawned
         self._processes = []
 
-        # shared memory client
-        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
+        # shared memory client, dead_retry=0(number of seconds before retrying
+        # a blacklisted server)
+        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']],
+                                   dead_retry=0, 
+                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)
 
     @staticmethod
     def load_configuration():        
@@ -258,9 +264,7 @@ class Runtime:
                                    HEARTBEAT_INTERVAL + 1)
                 if val is not True:
                     log_msg = 'failed to write heartbeat to the shared memory'
-                    LOG.error(log_msg)
-                    self._terminate_child_procs()
-                    return
+                    LOG.warning(log_msg)
 
                 t_last = t_now
 

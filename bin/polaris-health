@@ -45,7 +45,7 @@ case "$1" in
 
         doControl start        
         sleep 2
-        doControl ping ; EC=$?
+        doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
         then
             echo "failed to start!"

@@ -208,6 +208,11 @@ class Polaris(RemoteBackend):
         # get the distribution state object from shared memory
         sm_state = self._sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
 
+        # failed to get state from shared mem - ignore silently,
+        # continue to use the in-memory state
+        if sm_state is None:
+            return
+
         # check timestamp on it, if it did not change since the last pull
         # do not update the local memory state to avoid resetting
         # rotation indexes needlessly
