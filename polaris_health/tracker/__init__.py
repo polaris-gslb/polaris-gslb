@@ -22,6 +22,9 @@ PROBE_RESPONSES_QUEUE_WAIT =  0.05 # 50 ms
 # if state change occurred)
 SCAN_STATE_INTERVAL = 1 # 1s
 
+# memcache client socket timeout, must be less than SCAN_STATE_INTERVAL
+# to prevent a deadlock
+SHARED_MEM_SOCKET_TIMEOUT = 0.5
 
 class Tracker(multiprocessing.Process):
 
@@ -46,7 +49,9 @@ class Tracker(multiprocessing.Process):
         self.state = state.State(config_obj=config.LB)
 
         # init shared memory client(memcache.Client arg must be a list)
-        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
+        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']],
+                                   dead_retry=0, 
+                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)
 
     def run(self):
         """Main execution loop"""
@@ -81,15 +86,20 @@ class Tracker(multiprocessing.Process):
                 # if the state changed, push it to the shared memory
                 if self.state_changed:
 
+                    # all memcache pushes must succeed in order to
+                    # reset state changed flag
+                    pushes_ok = 0
+
                     # push PPDNS distribution form of the state
                     val = self._sm.set(
                         config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
                         self.state.to_dist_dict())
-                    if val is not True:
+                    if val is True:
+                        pushes_ok += 1
+                    else:    
                         log_msg = ('failed to write ppdns '
                                    'state to the shared memory')
-                        LOG.error(log_msg)
-                        raise Error(log_msg)
+                        LOG.warning(log_msg)
 
                     # push generic form of the state
                     obj = util.instance_to_dict(self.state)
@@ -98,16 +108,20 @@ class Tracker(multiprocessing.Process):
                     val = self._sm.set(
                         config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
                         obj)
-                    if val is not True:
+                    if val is True:
+                        pushes_ok += 1
+                    else:
                         log_msg = ('failed to write generic '
                                    'state to the shared memory')
-                        LOG.error(log_msg)
-                        raise Error(log_msg)
-            
-                    # reset state changed flag
-                    self.state_changed = False
+                        LOG.warning(log_msg)
 
-                    LOG.debug('synced state to the shared memory')
+                    # if all memcache pushes are successful reset 
+                    # state changed flag, otherwise keep it as True
+                    # so a push is attempted on the next iteration
+                    if pushes_ok == 2:
+                        LOG.debug('synced state to the shared memory')
+                        # reset state changed flag
+                        self.state_changed = False
  
                 # iterate the state, issue new probe requests
                 self._scan_state()
