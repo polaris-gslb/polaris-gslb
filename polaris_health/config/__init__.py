@@ -12,6 +12,8 @@ BASE = {
     'SHARED_MEM_GENERIC_STATE_KEY': 'polaris_health:generic_state',
     'SHARED_MEM_PPDNS_STATE_KEY': 'polaris_health:ppdns_state',
     'SHARED_MEM_HEARTBEAT_KEY': 'polaris_health:heartbeat',
+    'SHARED_MEM_SERVER_MAX_VALUE_LENGTH': 1048576,
+    'SHARED_MEM_SOCKET_TIMEOUT': 0.5,
 
     'NUM_PROBERS': 1,
 

@@ -11,3 +11,8 @@
 #
 # LOG: false
 
+################################
+# memcache hostname/ip:port to use e.g. 192.168.1.10:12345,
+# if port is omitted the default memcache port is used
+#
+# SHARED_MEM_HOSTNAME: 127.0.0.1
