@@ -9,7 +9,7 @@ import memcache
 
 from polaris_health import config, state, util
 from polaris_health.prober.probe import Probe
-
+import polaris_health.util.sharedmem
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
@@ -21,10 +21,6 @@ PROBE_RESPONSES_QUEUE_WAIT =  0.05 # 50 ms
 # how often to issue new probe requests and sync state to shared mem(but only
 # if state change occurred)
 SCAN_STATE_INTERVAL = 1 # 1s
-
-# memcache client socket timeout, must be less than SCAN_STATE_INTERVAL
-# to prevent a deadlock
-SHARED_MEM_SOCKET_TIMEOUT = 0.5
 
 class Tracker(multiprocessing.Process):
 
@@ -49,9 +45,7 @@ class Tracker(multiprocessing.Process):
         self.state = state.State(config_obj=config.LB)
 
         # init shared memory client(memcache.Client arg must be a list)
-        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']],
-                                   dead_retry=0, 
-                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)
+        self._sm = polaris_health.util.sharedmem.Client()
 
     def run(self):
         """Main execution loop"""

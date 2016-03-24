@@ -13,6 +13,7 @@ import yaml
 
 from polaris_common import topology
 from polaris_health import Error, config, prober, tracker
+import polaris_health.util.sharedmem
 import polaris_health.util.log
 
 __all__ = [ 'Runtime' ]
@@ -34,9 +35,6 @@ MAX_TERMINATE_ATTEMPTS = 5
 # delay between calling .terminate()
 TERMINATE_ATTEMPT_DELAY = 0.1
 
-# socket timeout on memcache client
-SHARED_MEM_SOCKET_TIMEOUT = 0.25
-
 
 class Runtime:
 
@@ -55,11 +53,8 @@ class Runtime:
         # multiprocessing.Process() objects of the child processes spawned
         self._processes = []
 
-        # shared memory client, dead_retry=0(number of seconds before retrying
-        # a blacklisted server)
-        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']],
-                                   dead_retry=0, 
-                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)
+        # shared memory client
+        self._sm = polaris_health.util.sharedmem.Client()
 
     @staticmethod
     def load_configuration():        

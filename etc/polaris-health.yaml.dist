@@ -1,5 +1,6 @@
 ################################
-# number of prober processes to run, each process will support up to 500 worker threads
+# number of prober processes to run, 
+# each process will support up to 500 worker threads
 #
 # NUM_PROBERS: 1
 
@@ -14,7 +15,7 @@
 # LOG_HANDLER: syslog
 
 ################################
-# hostname to use with the datagram handler
+# hostname/ip to use with the datagram handler
 #
 # LOG_HOSTNAME: 127.0.0.1
 
@@ -23,3 +24,14 @@
 #
 # LOG_PORT: 2222
 
+################################
+# memcache hostname/ip:port to use e.g. 192.168.1.10:12345,
+# if port is omitted the default memcache port is used
+#
+# SHARED_MEM_HOSTNAME: 127.0.0.1
+
+################################
+# memcache SERVER_MAX_VALUE_LENGTH the maximum value length the memcached 
+# will accept (memcached -I option)
+#
+# SHARED_MEM_SERVER_MAX_VALUE_LENGTH: 1048576
