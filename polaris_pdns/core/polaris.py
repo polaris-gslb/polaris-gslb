@@ -210,9 +210,7 @@ class Polaris(RemoteBackend):
             return
 
         # get the distribution state object from shared memory
-        sm_state = self._sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
-                                dead_retry=0,
-                                socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)
+        sm_state = self._sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
 
         # failed to get state from shared mem - ignore silently,
         # continue to use the in-memory state

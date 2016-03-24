@@ -123,7 +123,7 @@ class RemoteBackend:
             #method(obj['parameters'])
             #self.__write_response()
             #continue
-
+            
             # execute method
             try:
                 method(obj['parameters'])      
@@ -133,7 +133,7 @@ class RemoteBackend:
                                 .format(method_name, self.__request))
                 self.__write_response()
                 continue
-
+            
             # write response
             self.__write_response()
 
