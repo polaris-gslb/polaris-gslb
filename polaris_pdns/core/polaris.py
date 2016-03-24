@@ -32,7 +32,7 @@ class Polaris(RemoteBackend):
         # shared memory client
         self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']],
                                    dead_retry=0, 
-                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT))   
+                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)  
        
         # this will hold the distribution state
         self._state = {}
