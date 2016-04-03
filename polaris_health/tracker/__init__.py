@@ -10,7 +10,6 @@ import memcache
 from polaris_common import sharedmem
 from polaris_health import config, state, util
 from polaris_health.prober.probe import Probe
-import polaris_health.util.sharedmem
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
