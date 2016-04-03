@@ -27,7 +27,7 @@ def main():
         packages = setuptools.find_packages('.'),
         install_requires=[
             'pyyaml',
-            'python3-memcached', 
+            'python-memcached', 
             'python-daemon-3K'
         ],
         license='BSD 3-Clause',

@@ -50,7 +50,7 @@ class ProberProcess(multiprocessing.Process):
     def __init__(self, prober_requests, prober_responses):
         super(ProberProcess, self).__init__()
 
-        # Runtime-created queues to pass probes between Tracker 
+        # Guardian-created queues to pass probes between Tracker 
         # and Prober processes    
         self.prober_requests = prober_requests
         self.prober_responses = prober_responses
