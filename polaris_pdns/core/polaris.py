@@ -5,7 +5,7 @@ import json
 
 import memcache
 
-from polaris_common import topology
+from polaris_common import topology, sharedmem
 from polaris_pdns import config
 from .remotebackend import RemoteBackend
 
@@ -15,8 +15,6 @@ __all__ = [ 'Polaris' ]
 # minimum number of seconds between syncing distribution state from shared mem 
 STATE_SYNC_INTERVAL = 1
 
-# socket timeout on memcache client
-SHARED_MEM_SOCKET_TIMEOUT = 0.5
 
 class Polaris(RemoteBackend):
     
@@ -30,10 +28,10 @@ class Polaris(RemoteBackend):
         super(Polaris, self).__init__()
 
         # shared memory client
-        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']],
-                                   dead_retry=0, 
-                                   socket_timeout=SHARED_MEM_SOCKET_TIMEOUT)  
-       
+        self._sm = sharedmem.MemcacheClient(
+            [config.BASE['SHARED_MEM_HOSTNAME']],
+            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'])
+
         # this will hold the distribution state
         self._state = {}
 

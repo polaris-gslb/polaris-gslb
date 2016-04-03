@@ -11,7 +11,7 @@ import socket
 import memcache
 import yaml
 
-from polaris_common import topology
+from polaris_common import topology, sharedmem
 from polaris_health import Error, config, prober, tracker
 import polaris_health.util.sharedmem
 import polaris_health.util.log
@@ -54,7 +54,10 @@ class Guardian:
         self._processes = []
 
         # shared memory client
-        self._sm = polaris_health.util.sharedmem.Client()
+        self._sm = sharedmem.MemcacheClient(
+            [config.BASE['SHARED_MEM_HOSTNAME']],
+            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
+            server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
 
     @staticmethod
     def load_configuration():        

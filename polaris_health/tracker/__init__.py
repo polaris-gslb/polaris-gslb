@@ -7,6 +7,7 @@ import queue
 
 import memcache
 
+from polaris_common import sharedmem
 from polaris_health import config, state, util
 from polaris_health.prober.probe import Probe
 import polaris_health.util.sharedmem
@@ -44,8 +45,11 @@ class Tracker(multiprocessing.Process):
         # create health state table from the lb config
         self.state = state.State(config_obj=config.LB)
 
-        # init shared memory client(memcache.Client arg must be a list)
-        self._sm = polaris_health.util.sharedmem.Client()
+        # shared memory client
+        self._sm = sharedmem.MemcacheClient(
+            [config.BASE['SHARED_MEM_HOSTNAME']],
+            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
+            server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
 
     def run(self):
         """Main execution loop"""
