@@ -13,7 +13,6 @@ import yaml
 
 from polaris_common import topology, sharedmem
 from polaris_health import Error, config, prober, tracker
-import polaris_health.util.sharedmem
 import polaris_health.util.log
 
 __all__ = [ 'Guardian' ]
