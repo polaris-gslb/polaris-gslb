@@ -16,13 +16,13 @@ from polaris_health import Error, config, prober, tracker
 import polaris_health.util.sharedmem
 import polaris_health.util.log
 
-__all__ = [ 'Runtime' ]
+__all__ = [ 'Guardian' ]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
 # timeout on control socket so we don't eat CPU in the control loop
-# also affects how often Runtime healthcheck is ran
+# also affects how often Guardian healthcheck is ran
 CONTROL_SOCKET_TIMEOUT = 0.5
 # control socket recv() buffer size 
 CONTROL_SOCKET_RECV_BUFF_SIZE = 256
@@ -36,9 +36,9 @@ MAX_TERMINATE_ATTEMPTS = 5
 TERMINATE_ATTEMPT_DELAY = 0.1
 
 
-class Runtime:
+class Guardian:
 
-    """Polaris runtime.
+    """Polaris Guardian
 
     Loads configuration, sets up logging, starts other processes.
     Starts and periodically healthchecks other processes, if a child processes 
@@ -205,7 +205,7 @@ class Runtime:
 
     def _control_loop(self):
         """Accept and processes incoming connections on the control socket,
-        verify that all the processes spawned by the Runtime are alive
+        verify that all the processes spawned by the Guardian are alive
         (terminate the app if one of the child processes dies),
         push heartbeat into the shared memory
         """
@@ -325,7 +325,7 @@ class Runtime:
                     pass
 
     def _write_pid_file(self):
-        """Create file containing the PID of the Runtime process"""
+        """Create file containing the PID of the Guardian process"""
         try:
             with open(config.BASE['PID_FILE'], 'w') as fh:
                 fh.write(str(os.getpid()))
@@ -337,7 +337,7 @@ class Runtime:
             raise Error(log_msg)
 
     def _delete_pid_file(self):
-        """Delete Runtime process PID file"""
+        """Delete Guardian process PID file"""
         try:
             os.remove(config.BASE['PID_FILE'])
         except OSError as e:
