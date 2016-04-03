@@ -22,7 +22,8 @@ def main():
         version=VERSION,
         author='Anton Gavrik',    
         name='polaris-gslb',
-        description=('An extendable Global Server Load Balancing(GSLB) '
+        description=('A simple yet feature rich '
+                     'Global Server Load Balancing(GSLB) '
                      'solution, DNS-based traffic manager.'),
         packages = setuptools.find_packages('.'),
         install_requires=[
