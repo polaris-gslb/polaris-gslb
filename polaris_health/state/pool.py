@@ -123,7 +123,7 @@ class Pool:
             monitor: obj, a subclass of monitors.BaseMonitor
             members: list of PoolMember objects
             lb_method: string, distribution method name
-            fallback: sring, one of "any", "nodata", "refuse"
+            fallback: sring, one of "any", "refuse"
                 resolution behaviour when all members of the pool are DOWN
                 "any": perform distribution amongst all configured
                     members(ignore health status)
