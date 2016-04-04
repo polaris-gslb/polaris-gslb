@@ -4,8 +4,8 @@
 # HOSTNAME: polaris.example.com
 
 ################################
-# log a detailed request/response information to pdns
-# pdns.conf "loglevel" option should be set to 6 or higher
+# whether to log a detailed request/response information to pdns
+# if set to "true" pdns.conf "loglevel" option must be set to 6 or higher
 #
 # setting to "false" will improve the backend performance
 #

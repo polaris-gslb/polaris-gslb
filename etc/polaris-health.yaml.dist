@@ -5,7 +5,7 @@
 # NUM_PROBERS: 1
 
 ################################
-# log level, one of "none"(disables logging), "info", "debug", "warning", "error"
+# log level, one of "none"(disables logging), "debug", "info", "warning", "error"
 #
 # LOG_LEVEL: info
 
