@@ -5,7 +5,7 @@
 #
 # Python3 binary must be in the $PATH!
 launch=remote
-remote-connection-string=pipe:command=/opt/polaris/bin/polaris-pdns,timeout=1000
+remote-connection-string=pipe:command=/opt/polaris/bin/polaris-pdns,timeout=2000
 
 #################################
 # distributor-threads   Default number of Distributor (backend) threads to start
