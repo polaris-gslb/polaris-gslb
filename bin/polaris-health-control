@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
 import argparse
 import socket
+import sys
 
 import daemon
 
 from  polaris_health import config, guardian
 
 
+# minimum version of python3 required
+MINIMUM_PY3_VERSION = (3, 4, 3)
 # control socket recv() buffer size
 CONTROL_SOCKET_RECV_BUFF_SIZE = 256
 
@@ -34,6 +38,13 @@ def main():
 class PolarisHealthControl:
 
     def __init__(self):
+        # check for the minimum required py3 version
+        if sys.version_info < MINIMUM_PY3_VERSION:
+            min_version_str = '.'.join([ str(MINIMUM_PY3_VERSION[i]) 
+                           for i in range(len(MINIMUM_PY3_VERSION))])
+            raise Exception('Python version {} or later is required'.
+                            format(min_version_str))
+
         # load polaris_health.config
         guardian.Guardian.load_configuration()
 
