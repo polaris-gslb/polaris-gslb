@@ -2,10 +2,12 @@
 
 import ipaddress
 
+
 __all__ = [ 
     'config_to_map',
     'Resolver',
 ]
+
 
 def config_to_map(topology_config):
     """
@@ -39,7 +41,6 @@ def config_to_map(topology_config):
 
     raises:
         ValueError: if a region value is "_default"
-
     """
     # build topology map from topology_config:
     # {
@@ -57,6 +58,7 @@ def config_to_map(topology_config):
 
     return topology_map
 
+
 def get_region(ip_str, topology_map):
     """Return name of a region from the topology map for
     the given IP address
@@ -70,7 +72,6 @@ def get_region(ip_str, topology_map):
 
     raises:
         ValueError: raised by ipaddress if ip_str isn't a valid IP address
-
     """ 
     ip = ipaddress.ip_address(ip_str)
 

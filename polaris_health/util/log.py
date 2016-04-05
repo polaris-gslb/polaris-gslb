@@ -5,12 +5,14 @@ import logging.config
 
 from polaris_health import Error, config
 
+
 __all__ = [ 'setup', 'setup_debug' ]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
 FORMAT = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+
 
 class DatagramText(logging.handlers.DatagramHandler):
 
@@ -28,6 +30,7 @@ class DatagramText(logging.handlers.DatagramHandler):
             self.send(s)
         except Exception:
             self.handleError(record)
+
 
 def setup():
     """Setup logging"""
@@ -96,6 +99,7 @@ def setup():
         
     # initialize logging 
     logging.config.dictConfig(log_config)
+
 
 def setup_debug():
     """Setup debug mode logging"""

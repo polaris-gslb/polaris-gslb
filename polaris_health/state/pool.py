@@ -5,7 +5,8 @@ import ipaddress
 import random
 
 from polaris_health import Error, config, monitors
-from polaris_health.util import topology
+from polaris_common import topology
+
 
 __all__ = [ 'PoolMember', 'Pool' ]
 
@@ -18,6 +19,7 @@ MAX_POOL_NAME_LEN = 256
 MAX_REGION_LEN = 256
 MAX_MAX_ADDRS_RETURNED = 32
 
+
 def pprint_status(status):
     """Convert bool status into a health status string"""
 
@@ -29,6 +31,7 @@ def pprint_status(status):
         return 'NEW/UNKNOWN'
     else:
         raise Error('Invalid status "{}"'.format(status))
+
 
 class PoolMember:
 
@@ -43,7 +46,6 @@ class PoolMember:
                 is disabled
             region: string, id of the region, used in topology-based 
                 distribution
-        
         """
         ### ip
         try:
@@ -110,7 +112,7 @@ class Pool:
 
     """A pool of backend servers"""
 
-    LB_METHOD_OPTIONS = [ 'wrr', 'twrr' ]
+    LB_METHOD_OPTIONS = [ 'wrr', 'twrr', 'fogroup' ]
     FALLBACK_OPTIONS = [ 'any', 'refuse' ]
 
     def __init__(self, name, monitor, members, lb_method,
@@ -118,18 +120,16 @@ class Pool:
         """
         args:
             name: string, name of the pool
-            monitor: obj derived from monitors.BaseMonitor
-            members: dict where keys are IP addresses of members,
-                values are PoolMember objects
+            monitor: obj, a subclass of monitors.BaseMonitor
+            members: list of PoolMember objects
             lb_method: string, distribution method name
-            fallback: sring, one of "any", "nodata", "refuse"
+            fallback: sring, one of "any", "refuse"
                 resolution behaviour when all members of the pool are DOWN
                 "any": perform distribution amongst all configured
                     members(ignore health status)
                 "refuse": refuse queries
             max_addrs_returned: int, max number of A records to return in
                 response
-        
         """
         ### name
         self.name = name
@@ -188,26 +188,23 @@ class Pool:
 
         Read-only property based on health status of the pool members.
 
-        Return True is any member with non-0 weight of the pool is UP, 
+        Return True if any member of the pool with a non-0 weight is UP, 
         False otherwise.
-
         """
-        for member_ip in self.members:
-            if self.members[member_ip].weight > 0 \
-                    and self.members[member_ip].status:
+        for member in self.members:
+            if member.weight > 0 and member.status:
                 return True
 
         return False
 
     @classmethod
-    def from_config_dict(cls, name, obj):
+    def from_config_dict(cls, pool_name, obj):
         """Build a Pool object from a config dict
 
         args:
-            name: string, name of the pool
+            pool_name: string, pool_name of the pool
             obj: dict, config dict
         """
-
         ############################
         ### mandatory parameters ###
         ############################
@@ -236,36 +233,39 @@ class Pool:
         lb_method = obj['lb_method']
 
         ### members
-        members = {}
+        members = []
 
         # validate "members" key is present and not empty
         if not 'members' in obj or not obj['members']:
             log_msg = ('configuration dictionary must contain '
-                       'a non-empty "members" key')    
+                       'a non-empty "members" list')    
             LOG.error(log_msg)
             raise Error(log_msg)
 
-        for member_ip in obj['members']:
-            member_name = obj['members'][member_ip]['name']
-            weight = obj['members'][member_ip]['weight']
-
-            region = None
-            # if topology round robin method is used
-            # set region on the pool member
-            if lb_method == 'twrr':
-                region = topology.get_region(
-                    member_ip, config.TOPOLOGY_MAP)
-                if not region:
-                    log_msg  = ('Unable to determine region for pool '
-                                '{0} member {1}({2})'.
-                               format(name, member_ip, member_name)) 
+        for member_obj in obj['members']:
+            # ensure a member with the same IP doesn't exist already 
+            for _m in members:
+                if member_obj['ip'] == _m.ip:
+                    log_msg = 'duplicate member IP {}'.format(member_obj['ip'])
                     LOG.error(log_msg)
                     raise Error(log_msg)
 
-            members[member_ip] = PoolMember(ip=member_ip, 
-                                            name=member_name, 
-                                            weight=weight,
-                                            region=region)
+            region = None
+            # if topology lb method is used - set region on the pool member
+            if lb_method == 'twrr':
+                region = topology.get_region(
+                    member_obj['ip'], config.TOPOLOGY_MAP)
+                if not region:
+                    log_msg  = ('unable to determine region for member {}({})'
+                                .format(member_obj['ip'], member_obj['name'])) 
+                    LOG.error(log_msg)
+                    raise Error(log_msg)
+
+            _m = PoolMember(ip=member_obj['ip'], 
+                            name=member_obj['name'], 
+                            weight=member_obj['weight'],
+                            region=region)
+            members.append(_m)
 
         ###########################
         ### optional parameters ###
@@ -282,14 +282,14 @@ class Pool:
                 obj['max_addrs_returned']
 
         # return Pool object
-        return cls(name=name,
+        return cls(name=pool_name,
                    monitor=monitor,
                    lb_method=lb_method,
                    members=members,
                    **pool_optional_params)
 
     def to_dist_dict(self):
-        """Return dict representation of the Pool required  by Polaris PDNS
+        """Return dict representation of the Pool required by Polaris PDNS
         to perform query distribution.
 
         "_default" distribution table is always built.
@@ -323,7 +323,6 @@ class Pool:
                     },
                 }
             }
-
         """
         obj = {}
 
@@ -351,9 +350,7 @@ class Pool:
         ### pool is UP ###
         ##################
         if self.status:
-            for member_ip in self.members:
-                member = self.members[member_ip]
-
+            for member in self.members:
                 # do not add members with the weight of 0 - member is disabled
                 if member.weight == 0:
                     continue
@@ -369,11 +366,15 @@ class Pool:
                 # add the member IP times it's weight into 
                 # the _default distribution table
                 for i in range(member.weight):
-                    dist_tables['_default']['rotation'].append(member_ip)
+                    dist_tables['_default']['rotation'].append(member.ip)
 
                 # increase the number of unique addresses in the _default by 1
                 dist_tables['_default']['num_unique_addrs'] += 1
-        
+       
+                # if lb_method is failover group do not add any more members
+                if self.lb_method == 'fogroup':
+                    break
+
                 #
                 # add to a regional table
                 #
@@ -390,7 +391,8 @@ class Pool:
                     # add the member IP times it's weight
                     # into the regional table
                     for i in range(member.weight):
-                        dist_tables[member.region]['rotation'].append(member_ip)
+                        dist_tables[member.region]['rotation'].append(
+                            member.ip)
 
                     # increase the number of unique addresses in the table by 1
                     dist_tables[member.region]['num_unique_addrs'] += 1
@@ -399,9 +401,7 @@ class Pool:
         ### pool is DOWN ###
         ####################
         else:
-            for member_ip in self.members:
-                member = self.members[member_ip]
-
+            for member in self.members:
                 # do not add members with weight of 0 - member is disabled
                 if member.weight == 0:
                     continue
@@ -411,7 +411,7 @@ class Pool:
                     # add the member IP times it's weight into
                     # the _default distribution table
                     for i in range(member.weight):
-                        dist_tables['_default']['rotation'].append(member_ip)
+                        dist_tables['_default']['rotation'].append(member.ip)
 
                     # increase the number of unique addresses
                     # in the _default by 1

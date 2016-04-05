@@ -4,10 +4,8 @@ import logging
 
 from polaris_health import Error
 
-__all__ = [ 
-    'BaseMonitor',
-    'registered'
-]
+
+__all__ = [ 'BaseMonitor', 'registered' ]
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
@@ -19,6 +17,7 @@ MIN_TIMEOUT = 0.1
 MAX_TIMEOUT = 5
 MIN_RETRIES = 0
 MAX_RETRIES = 5
+
 
 class BaseMonitor:
 

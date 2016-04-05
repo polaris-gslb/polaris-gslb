@@ -1,25 +1,20 @@
-# Polaris-specific PDNS configuration
+# Polaris specific PDNS configuration
 
 #################################
 # launch    Which backends to launch and order to query them in
 #
-# launch=
+# Python3 binary must be in the $PATH!
 launch=remote
-remote-connection-string=pipe:command=/opt/python3/bin/python3 /opt/polaris/bin/polaris-pdns,timeout=1000
+remote-connection-string=pipe:command=/opt/polaris/bin/polaris-pdns,timeout=2000
 
 #################################
 # distributor-threads   Default number of Distributor (backend) threads to start
 #
 # distributor-threads=3
-distributor-threads=6
 
-#################################
-# loglevel  Amount of logging. Higher is more. Do not set below 3
+# logs received from a Polaris remotebackend will be logged from loglevel 6 
 #
-# loglevel=4
-
-# logs received from a remotebackend will be logged from loglevel 6 
-loglevel=6
+# loglevel=6
 
 # If not using the topology load balancing method, comment out the caching 
 # options below to greatly improve the backend performance

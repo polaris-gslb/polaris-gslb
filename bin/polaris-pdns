@@ -1,52 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/bin/sh
 
-"""Invoke Polaris PDNS Remote Backend"""
+. /etc/default/polaris
 
-import os
-import inspect
-import re
+POLARIS_PDNS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/polaris-pdns-control"
 
-import yaml
-
-import polaris_pdns
-from polaris_pdns import config
-from polaris_health.util import topology
-
-# determine the install prefix
-path = os.path.abspath(
-    os.path.split(inspect.getfile( inspect.currentframe() ))[0])
-m = re.search(r'(.+)\/bin', path)
-if m:
-    INSTALL_PREFIX = m.group(1)
-else:
-    raise Exception('Cannot determine the installation directory prefix')
-    
-# load BASE configuration
-base_config_file = os.path.join(INSTALL_PREFIX, 'etc', 'polaris-pdns.yaml')
-if os.path.isfile(base_config_file):
-    with open(base_config_file) as fp:
-        base_config = yaml.load(fp)
-
-    if base_config:
-        # validate and set values
-        for k in base_config:
-            if k not in config.BASE:
-                raise Exception('unknown configuration option "{}"'.format(k))
-            else:
-                config.BASE[k] = base_config[k]
-
-# load TOPOLOGY_MAP configuration
-topology_config_file = os.path.join(
-    INSTALL_PREFIX, 'etc', 'polaris-topology.yaml')
-if os.path.isfile(topology_config_file):
-    with open(topology_config_file) as fp:
-        topology_config = yaml.load(fp)
-
-    if topology_config:
-        config.TOPOLOGY_MAP = \
-            topology.config_to_map(topology_config)
-
-# start the remote backend
-polaris_pdns.main()
+$POLARIS_PDNS_CONTROL_CMD
 
