@@ -1,178 +1,107 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          polaris-health
+# Required-Start:    $remote_fs $network $syslog
+# Required-Stop:     $remote_fs $network $syslog
+# Should-Start:
+# Should-Stop:
+# Default-Start:     3
+# Default-Stop:      0 1 6
+# Short-Description: Polaris Health
+# Description:       Polaris Health
+### END INIT INFO
 
-"""Polaris health control script"""
+. /etc/default/polaris
 
-import argparse
-import os
-import inspect
-import re
-import signal
-import time
+POLARIS_CONTROL_CMD="$POLARIS_INSTALL_PREFIX/bin/polaris-health-control"
 
-import yaml
-import daemon
+doControl()
+{
+    ret=$($POLARIS_CONTROL_CMD $1)
+}
 
-import polaris_health
-from polaris_health import config
-from polaris_health.util import topology, log
+case "$1" in
+    status)
+        doControl ping 2>/dev/null ; EC=$?
+        if test "$EC" != "0"
+        then 
+            echo "not running"
+            exit 1
+        else
+            echo "running"
+        fi
+    ;;
 
-# maximum number of seconds to wait for the pid file to be deleted
-# after stopping the health tracker
-RESTART_TIMEOUT = 10
+    start)
+        echo -n "Starting Polaris Health... "
 
-# determine directory path prefix where polaris is installed
-path = os.path.abspath(
-    os.path.split(inspect.getfile( inspect.currentframe() ))[0])
-m = re.search(r'(.+)\/bin', path)
-if m:
-   INSTALL_PREFIX  = m.group(1)
-else:
-    raise Exception('Cannot determine the installation directory prefix')
+        # ensure polaris is not already running
+        doControl ping 2>/dev/null ; EC=$?
+        if test "$EC" = "0"
+        then
+            echo "aborted, already running!"
+            exit 1
+        fi
 
-# set the configuration INSTALL_PREFIX
-config.BASE['INSTALL_PREFIX'] = INSTALL_PREFIX
+        doControl start        
+        sleep 2
+        doControl ping 2>/dev/null ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "failed to start!"
+            exit 1
+        else
+            echo "done."
+        fi
+    ;;
 
-PID_FILE = os.path.join(INSTALL_PREFIX, 'run', 'polaris-health.pid')
+    start-debug)
+        echo "Starting Polaris Health in debug mode... "
+        $POLARIS_CONTROL_CMD start-debug
+    ;;
 
-def main():
-    # get command line arguments
-    parser = argparse.ArgumentParser(description="Polaris health tracker")
-
-    parser.add_argument('action',
-                        choices=['start', 'stop', 'restart']) 
-
-    parser.add_argument('-d',
-                        action='store_true',
-                        help='do not daemonize, output debug to console') 
-
-    opts = parser.parse_args()
-
-    # load BASE configuration
-    base_config_file = os.path.join(
-        INSTALL_PREFIX, 'etc', 'polaris-health.yaml')
-    if os.path.isfile(base_config_file):
-        with open(base_config_file) as fp:
-            base_config = yaml.load(fp)
-
-        if base_config:
-            # validate and set values
-            for k in base_config:
-                if k not in config.BASE:
-                    raise Exception('unknown configuration option "{}"'
-                                    .format(k))
-                else:
-                    config.BASE[k] = base_config[k]
-
-    # load LB configuration
-    lb_config_file = os.path.join(
-        INSTALL_PREFIX, 'etc', 'polaris-lb.yaml')
-    if not os.path.isfile(lb_config_file):
-        raise Exception('{} does not exist'.format(lb_config_file))
-    else:
-        with open(lb_config_file) as fp:
-            config.LB = yaml.load(fp)
-
-    # load TOPOLOGY_MAP configuration
-    topology_config_file = os.path.join(
-        INSTALL_PREFIX, 'etc', 'polaris-topology.yaml')
-    if os.path.isfile(topology_config_file):
-        with open(topology_config_file) as fp:
-            topology_config = yaml.load(fp)
-
-        if topology_config:
-            config.TOPOLOGY_MAP = \
-                topology.config_to_map(topology_config)
-
-    # perform an action
-    if opts.action == 'start':
-        start(debug=opts.d)
-    elif opts.action == 'stop':
-        stop()
-    elif opts.action == 'restart':
-        restart(debug=opts.d)
-
-def start(debug=False):
-    """Start the health tracker
-
-    args: debug, bool, when True the health tracker will not daemonize,
-    debug log is sent to stdout
-    """
-    # check if the pid file exists
-    if os.path.isfile(PID_FILE):
-        # check if the process with the pid exists
-        with open(PID_FILE) as fp:
-            pid = int(fp.read())
-
-        # send process signal 0
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            # no such process, continue execution    
-            pass
-        else:
-            # no error means a process with this pid is running
-            raise Exception('Polaris health is already running? ' 
-                            'If not, remove {} before attempting to start'
-                            .format(PID_FILE))
-
-    # debug foreground mode
-    if debug:
-        # setup debug logging(console)
-        log.setup_debug()
-        # run health tracker in the foreground    
-        polaris_health.main()
-
-    # normal daemon mode
-    else:
-        # setup logging    
-        log.setup()
-
-        # turn into a daemon
-        with daemon.DaemonContext():
-            polaris_health.main()
-
-def stop():
-    """Stop the health tracker"""
-
-    # check if pid file exists
-    if not os.path.isfile(PID_FILE):
-        raise Exception('Unable to stop, {} file does not exist'
-                        .format(PID_FILE))
-
-    # get the Reactor PID
-    with open(PID_FILE) as fp:
-        pid = int(fp.read())
+    stop)
+        echo -n "Stopping Polaris Health... "
         
-    # signal reactor to exit
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        raise Exception('{} is present and showing PID {}, '
-                        'but no process with this PID exists'
-                        .format(PID_FILE, pid))
+        # ensure polaris is running
+        doControl ping 2>/dev/null ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "aborted, not running!"
+            exit 1
+        fi
 
-def restart(debug=False):
-    """Restart the health tracker"""
-    # stop the health tracker
-    stop()
+        doControl stop
+        echo "done."
+    ;;
 
-    # wait until the pid file has been deleted 
-    # and then start the health tracker
-    time.sleep(1)
-    remaining_timeout = RESTART_TIMEOUT - 1
-    while remaining_timeout > 0:
-        if os.path.isfile(PID_FILE):
-            time.sleep(0.5)
-            remaining_timeout -= 0.5
-            continue
-        else:
-            start()
+    restart)
+        echo -n "Restarting Polaris Health... "
 
-    # pid file hasn't been deleted within RESTART_TIMEOUT    
-    raise Exception('Timeout waiting for {} to be removed'
-                    .format(PID_FILE))
+        # ensure polaris is running
+        doControl ping 2>/dev/null ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "aborted, not running!"
+            exit 1
+        fi
 
-if __name__ == '__main__':
-    main()
+        doControl stop  
+        sleep 2
+        doControl start
+        sleep 2
+        doControl ping 2>/dev/null ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "failed to start!"
+            exit 1
+        else
+            echo "done."
+        fi
+    ;;
 
+    *)
+    echo polaris-health [status\|start\|start-debug\|stop\|restart]
+    ;;
+
+esac

@@ -7,7 +7,9 @@ import time
 
 from polaris_pdns import config
 
+
 __all__ = [ 'RemoteBackend' ]
+
 
 class RemoteBackend:
 
@@ -121,7 +123,7 @@ class RemoteBackend:
             #method(obj['parameters'])
             #self.__write_response()
             #continue
-
+            
             # execute method
             try:
                 method(obj['parameters'])      
@@ -131,7 +133,7 @@ class RemoteBackend:
                                 .format(method_name, self.__request))
                 self.__write_response()
                 continue
-
+            
             # write response
             self.__write_response()
 
@@ -147,7 +149,6 @@ class RemoteBackend:
 
         You can optionally add 'log' array, each line in this array will be 
         logged in PowerDNS."
-
         """
         obj = {}
         obj['result'] = self.result

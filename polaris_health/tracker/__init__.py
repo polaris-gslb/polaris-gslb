@@ -7,15 +7,16 @@ import queue
 
 import memcache
 
+from polaris_common import sharedmem
 from polaris_health import config, state, util
-from .probe import Probe
+from polaris_health.prober.probe import Probe
 
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
 # how long to wait(block) when reading from probe response queue
 # non-blocking will eat 100% cpu at low message rate
-PROBE_RESPONSE_QUEUE_WAIT =  0.05 # 50 ms
+PROBE_RESPONSES_QUEUE_WAIT =  0.05 # 50 ms
 
 # how often to issue new probe requests and sync state to shared mem(but only
 # if state change occurred)
@@ -27,34 +28,35 @@ class Tracker(multiprocessing.Process):
     shared memory.
     """
 
-    def __init__(self, probe_request_queue, probe_response_queue):
+    def __init__(self, prober_requests, prober_responses):
         """
         args:
-            probe_request_queue: multiprocessing.Queue(), 
+            prober_requests: multiprocessing.Queue(), 
                 queue to put new probes on
-            probe_response_queue: multiprocessing.Queue(),
+            prober_responses: multiprocessing.Queue(),
                 queue to get processed probes from
-
-        """    
+        """
         super(Tracker, self).__init__()
 
-        self.probe_request_queue = probe_request_queue
-        self.probe_response_queue = probe_response_queue
+        self.prober_requests = prober_requests
+        self.prober_responses = prober_responses
 
         # create health state table from the lb config
         self.state = state.State(config_obj=config.LB)
 
-        # init shared memory client(memcache.Client arg must be a list)
-        self._sm = memcache.Client([config.BASE['SHARED_MEM_HOSTNAME']])
+        # shared memory client
+        self._sm = sharedmem.MemcacheClient(
+            [config.BASE['SHARED_MEM_HOSTNAME']],
+            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
+            server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
 
     def run(self):
         """Main execution loop"""
-
         # init last_scan_state_time so we know when to run the first scan
         last_scan_state_time = time.time()
 
         # Track whether status of any of the backend servers changed.
-        # If the state has changed we will push it to share _mem, but no more
+        # If the state has changed we will push it to shared mem, but no more
         # often than SCAN_STATE_INTERVAL
         self.state_changed = False
 
@@ -63,8 +65,8 @@ class Tracker(multiprocessing.Process):
             try:
                 # block with a small timeout,
                 # non-blocking will load cpu needlessly
-                probe = self.probe_response_queue.get(
-                    True, PROBE_RESPONSE_QUEUE_WAIT)
+                probe = self.prober_responses.get(
+                    block=True, timeout=PROBE_RESPONSES_QUEUE_WAIT)
             except queue.Empty: # nothing on the queue
                 pass
             else:
@@ -74,42 +76,66 @@ class Tracker(multiprocessing.Process):
             # if there was a state change in the last SCAN_STATE_INTERVAL,
             # push it to shared mem
             if time.time() - last_scan_state_time > SCAN_STATE_INTERVAL:
+
                 # update last scan state time
                 last_scan_state_time = time.time()
 
                 # if the state changed, push it to the shared memory
                 if self.state_changed:
 
-                    # push PPDSN distribution form of the state
-                    self._sm.set(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
-                                 self.state.to_dist_dict())
+                    # all memcache pushes must succeed in order to
+                    # reset state changed flag
+                    pushes_ok = 0
+
+                    # push PPDNS distribution form of the state
+                    val = self._sm.set(
+                        config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
+                        self.state.to_dist_dict())
+                    if val is True:
+                        pushes_ok += 1
+                    else:    
+                        log_msg = ('failed to write ppdns '
+                                   'state to the shared memory')
+                        LOG.warning(log_msg)
 
                     # push generic form of the state
                     obj = util.instance_to_dict(self.state)
+                    # add epoch time timestampt to the object
                     obj['timestamp'] = time.time()
-                    self._sm.set(config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
-                                 obj)
+                    val = self._sm.set(
+                        config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
+                        obj)
+                    if val is True:
+                        pushes_ok += 1
+                    else:
+                        log_msg = ('failed to write generic '
+                                   'state to the shared memory')
+                        LOG.warning(log_msg)
 
-                    # reset state changed flag
-                    self.state_changed = False
-
-                    LOG.debug('synced state, version to the shared memory')
+                    # if all memcache pushes are successful reset 
+                    # state changed flag, otherwise keep it as True
+                    # so a push is attempted on the next iteration
+                    if pushes_ok == 2:
+                        LOG.debug('synced state to the shared memory')
+                        # reset state changed flag
+                        self.state_changed = False
  
                 # iterate the state, issue new probe requests
                 self._scan_state()
 
     def _process_probe(self, probe):
-        """Process a probe, change the associated member status accordingly.
+        """Process probe, change the associated member status accordingly.
         
         args:
             probe: Probe() object
-
         """
         LOG.debug('received {}'.format(str(probe)))  
 
         # get a reference to the individual pool member 
         # based on pool_name and member_ip
-        member = self.state.pools[probe.pool_name].members[probe.member_ip]    
+        for member in self.state.pools[probe.pool_name].members:
+            if member.ip == probe.member_ip:
+                break
 
         # set member status attributes 
         member.status_reason = probe.status_reason
@@ -159,12 +185,10 @@ class Tracker(multiprocessing.Process):
         self._change_pool_last_status(self.state.pools[probe.pool_name])
 
     def _scan_state(self):
-        """Iterate over the health table, request health probes"""
+        """Iterate over the state, request health probes"""
         for pool_name in self.state.pools:
             pool = self.state.pools[pool_name]
-            for member_ip in pool.members:
-                member = pool.members[member_ip]
-
+            for member in pool.members:
                 # request probe if required
                 self._request_probe(pool, member)
 
@@ -187,13 +211,15 @@ class Tracker(multiprocessing.Process):
         else:
             member.retries_left = pool.monitor.retries
             request_probe = True
-
+        
         if request_probe:
             # issue probe
             probe = Probe(pool_name=pool.name,
                           member_ip=member.ip,
                           monitor=pool.monitor)
-            self.probe_request_queue.put(probe) 
+
+            self.prober_requests.put(probe) 
+
             # update the time when the probe was issued
             member.last_probe_issued_time = time.time()
         

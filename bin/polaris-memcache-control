@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import time
+import json
+
+import memcache
+
+
+SHARED_MEM_HOSTNAME = '127.0.0.1'
+SHARED_MEM_GENERIC_STATE_KEY = 'polaris_health:generic_state'
+SHARED_MEM_PPDNS_STATE_KEY = 'polaris_health:ppdns_state'
+SHARED_MEM_HEARTBEAT_KEY = 'polaris_health:heartbeat'
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Polaris memcache control")
+    parser.add_argument('action',
+                        choices=[
+                            'get-generic-state',
+                            'get-ppdns-state',
+                            'get-heartbeat',
+                            'check-heartbeat'
+                            ]) 
+    opts = parser.parse_args()
+
+    pmc = PolarisMemcacheControl()
+
+    method = opts.action.replace('-', '_')
+    getattr(pmc, method)()
+
+
+class PolarisMemcacheControl:
+
+    def __init__(self):
+        self._mc = memcache.Client([SHARED_MEM_HOSTNAME])
+
+    def get_generic_state(self):
+        """Get generic form of the state"""
+        val = self._mc_get(SHARED_MEM_GENERIC_STATE_KEY)
+        print(json.dumps(val, indent=4))
+
+    def get_ppdns_state(self):
+        """Get ppdns form of the state"""
+        val = self._mc_get(SHARED_MEM_PPDNS_STATE_KEY)
+        print(json.dumps(val, indent=4))
+
+    def get_heartbeat(self):
+        """Get Runtime's heartbeat"""
+        val = self._mc_get(SHARED_MEM_HEARTBEAT_KEY)
+        obj = json.loads(val)
+        timestamp_human = time.asctime(time.gmtime(obj['timestamp']))
+        print('timestamp: {timestamp}({timestamp_human})'
+              .format(timestamp=obj['timestamp'], 
+                      timestamp_human=timestamp_human))
+        
+    def check_heartbeat(self):
+        """Ensure the heartbeat is valid"""
+        val = self._mc_get(SHARED_MEM_HEARTBEAT_KEY)
+        obj = json.loads(val)
+        timestamp_human = time.asctime(time.gmtime(obj['timestamp']))
+        localtime = time.time()
+        localtime_human=time.asctime(time.gmtime(localtime))
+        if localtime - obj['timestamp'] > 2:
+            raise Exception('aged timestamp '
+                            'localtime: {local}({local_human}) '
+                            'timestamp: {timestamp}({timestamp_human})'
+                            .format(local=localtime,
+                                    local_human=localtime_human,
+                                    timestamp=obj['timestamp'],
+                                    timestamp_human=timestamp_human))
+
+    def _mc_get(self, key):    
+        val = self._mc.get(key)
+        if val is None:
+            raise Exception('memcache get {} failed'.format(key))
+        return val     
+
+
+if __name__ == '__main__':
+    main()
+

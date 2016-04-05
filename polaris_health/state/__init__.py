@@ -69,7 +69,7 @@ class State:
                 raise Error(log_str)
 
             self.pools[pool_name] = \
-                Pool.from_config_dict(name=pool_name,
+                Pool.from_config_dict(pool_name=pool_name,
                                       obj=obj['pools'][pool_name])
 
         # build globalnames
