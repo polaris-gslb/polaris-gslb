@@ -9,7 +9,7 @@ A versatile Global Server Load Balancing(GSLB) solution, DNS-based traffic manag
     * Failover group(active/backup mode)
 * Parameterized(timeout, interval, retries etc.) health monitors:
     * TCP(send string, match reg exp)
-    * HTTP
+    * HTTP/S
 * Up to 32 addresses returned in a response
 * Different ways to handle the "all-pool-members-down" situation(fallback):
     * return any configured end-points(ignore the health status) 
