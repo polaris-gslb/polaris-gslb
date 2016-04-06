@@ -6,7 +6,7 @@ A versatile Global Server Load Balancing(GSLB) solution, DNS-based traffic manag
 * Load-balancing methods:
     * Weighted round-robin
     * Topology(direct clients to the end-points in the same region/datacenter)
-    * Failover group(active/backup mode)
+    * Failover group(active/backup)
 * Parameterized(timeout, interval, retries etc.) health monitors:
     * TCP(send string, match reg exp)
     * HTTP/S
