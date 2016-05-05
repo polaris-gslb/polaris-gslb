@@ -163,11 +163,11 @@ class Polaris(RemoteBackend):
                              content=dist_table['names'][dist_table['index']],
                              ttl=self._state['globalnames'][qname]['ttl'])
 
-             # increase index
-             dist_table['index'] += 1
-             # set the index to 0 if we reached the end of the rotation list
-             if dist_table['index'] >= len(dist_table['rotation']):
-                 dist_table['index'] = 0
+                # increase index
+                dist_table['index'] += 1
+                # set the index to 0 if we reached the end of the rotation list
+                if dist_table['index'] >= len(dist_table['rotation']):
+                    dist_table['index'] = 0
 
         ### add records to the response ###
         for i in range(num_records_return):
