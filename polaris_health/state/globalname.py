@@ -73,9 +73,14 @@ class GlobalName:
                        .format(name))
             LOG.error(log_msg)
             raise Error(log_msg)
- 
-        return cls(name=name, pool_name=obj['pool'], ttl=obj['ttl'], nsrecord=obj['nsrecord'])
 
+        if 'nsrecord' not in obj:
+            nsrecord_val=False
+        else:
+            nsrecord_val=obj['nsrecord']
+
+        return cls(name=name, pool_name=obj['pool'], ttl=obj['ttl'], nsrecord=nsrecord_val)
+ 
     def to_dist_dict(self):
         """Return a dict representation of the GlobalName required by 
         Polaris PDNS to perform distribution.
