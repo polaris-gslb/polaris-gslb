@@ -43,4 +43,12 @@ globalnames:
         pool: ns-example
         ttl: 3600
         nsrecord: true
+    ns1.example.com:
+        pool: ns-example
+        ttl: 3600
+        nsrecord: false
+    ns2.example.com:
+        pool: ns-example
+        ttl: 3600
+        nsrecord: false
 
