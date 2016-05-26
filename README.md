@@ -5,10 +5,10 @@ A light-weight, extendable Global Server Load Balancing(GSLB) solution, DNS-base
 * Built as an enhancement for [PowerDNS Authoritative Server](https://www.powerdns.com/auth.html)
 * Load-balancing methods:
     * Weighted round-robin
-    * Topology(direct clients to the end-points in the same region/datacenter)
+    * Topology(direct clients to end-points in the same region/datacenter)
     * Failover group(active-backup)
 * Parameterized(timeout, interval, retries etc.) health monitors:
-    * TCP(send string, match reg exp)
+    * TCP(send string, match regexp)
     * HTTP/S
 * Up to 32 addresses returned in a response
 * Different ways to handle the "all-pool-members-down" situation(fallback):
