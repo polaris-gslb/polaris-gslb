@@ -3,8 +3,6 @@
 import logging
 import time
 import sys
-import io
-import traceback
 
 from polaris_health import MonitorFailed
 
@@ -19,16 +17,18 @@ class Probe(object):
 
     """Health monitor probe"""
 
-    def __init__(self, pool_name, member_ip, monitor):
+    def __init__(self, pool_name, member_ip, monitor, monitor_ip):
         """
         args:
             pool_name: string, name of the pool
-            member_ip: string
+            member_ip: string, IP address
             monitor: monitors.BaseMonitor derived object
+            monitor_ip: string, destination IP address to use for monitor
         """
         self.pool_name = pool_name
         self.member_ip = member_ip
         self.monitor = monitor
+        self.monitor_ip = monitor_ip
 
         # None, True - probe succeded, False - probe failed
         self.status = None
@@ -41,25 +41,19 @@ class Probe(object):
 
     def run(self):
         """Run the monitor code"""
-
         try:
-            # run monitor on member_ip
-            self.monitor.run(dst_ip=self.member_ip)
+            self.monitor.run(dst_ip=self.monitor_ip)
         except MonitorFailed as e:
             # if monitor failed status = False
             self.status = False
             self.status_reason =  str(e)
             self.status_time = time.time()
-        
         # protect the app from crashing if a monitor crashes
         except Exception as e:
-            # get traceback
-            fo = io.StringIO()
-            traceback.print_exception(*sys.exc_info(), limit=None, file=fo)
             self.status = False
             self.status_reason =  str(e)
             self.status_time = time.time()
-            LOG.error('{} crashed, tb: {}'.format(str(self), fo.getvalue()))
+            LOG.exception('{} crashed:\n{}'.format(str(self), e))
 
         # monitor passed
         else:
@@ -71,10 +65,19 @@ class Probe(object):
 
     def __str__(self):
         s = 'Probe('
-        s += ('pool: {} member_ip: {} monitor: {} status: {} '
-              'status_reason: {} status_time: {})'
-              .format(self.pool_name, self.member_ip, 
-                      self.monitor.__class__.__name__, 
-                      self.status, self.status_reason, self.status_time))
+        s += ('pool: {pool_name} '
+              'member_ip: {member_ip} '
+              'monitor: {monitor} '
+              'monitor_ip: {monitor_ip} '
+              'status: {status} '
+              'status_reason: {status_reason} '
+              'status_time: {status_time})'
+              .format(pool_name=self.pool_name, 
+                      member_ip=self.member_ip, 
+                      monitor=self.monitor.__class__.__name__,
+                      monitor_ip=self.monitor_ip,
+                      status=self.status, 
+                      status_reason=self.status_reason, 
+                      status_time=self.status_time))
         return s
 

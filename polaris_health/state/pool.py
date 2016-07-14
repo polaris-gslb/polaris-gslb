@@ -37,7 +37,7 @@ class PoolMember:
 
     """A backend server, member of a pool"""
 
-    def __init__(self, ip, name, weight, region=None):
+    def __init__(self, ip, name, weight, region=None, monitor_ip=None):
         """
         args:
             ip: string, IP address
@@ -46,6 +46,9 @@ class PoolMember:
                 is disabled
             region: string, id of the region, used in topology-based 
                 distribution
+            monitor_ip: string, IP address to use to determine 
+                the health status of this member, if unspecified, set to 
+                member's ip
         """
         ### ip
         try:
@@ -86,11 +89,32 @@ class PoolMember:
                 and (not isinstance(region, (str)) 
                  or len(region) > MAX_REGION_LEN)):
             log_msg = ('"{}" region "{}" must be a str, {} chars max'.
-                       format(name, region, MAX_POOL_MEMBER_NAME_LEN))
+                       format(name, region, MAX_REGION_LEN))
             LOG.error(log_msg)
             raise Error(log_msg)
         else:
-            self.region = region          
+            self.region = region  
+
+        ### monitor_ip
+        if monitor_ip is not None:
+            try:
+                _ip = ipaddress.ip_address(monitor_ip)
+            except ValueError:
+                log_msg = ('"{}" does not appear to be a valid IP address'
+                           .format(monitor_ip))
+                LOG.error(log_msg)
+                raise Error(log_msg)
+
+            if _ip.version != 4:
+                log_msg = 'only v4 IP addresses are currently supported'
+                LOG.error(log_msg)
+                raise Error(log_msg)
+
+            self.monitor_ip = monitor_ip
+
+        # if monitor_ip is None, set it to the self.ip
+        else:
+            self.monitor_ip = self.ip
 
         # curent status of the server
         # None = new, True = up, False = down
@@ -205,9 +229,9 @@ class Pool:
             pool_name: string, pool_name of the pool
             obj: dict, config dict
         """
-        ############################
-        ### mandatory parameters ###
-        ############################
+        #################################
+        ### pool mandatory parameters ###
+        #################################
 
         ### monitor
         if obj['monitor'] not in monitors.registered:
@@ -250,8 +274,11 @@ class Pool:
                     LOG.error(log_msg)
                     raise Error(log_msg)
 
-            region = None
-            # if topology lb method is used - set region on the pool member
+            ### member optional parameters ###
+            member_optional_params = {}
+
+            ### region
+            # if topology lb method is used - set region
             if lb_method == 'twrr':
                 region = topology.get_region(
                     member_obj['ip'], config.TOPOLOGY_MAP)
@@ -260,16 +287,21 @@ class Pool:
                                 .format(member_obj['ip'], member_obj['name'])) 
                     LOG.error(log_msg)
                     raise Error(log_msg)
+                member_optional_params['region'] = region
+
+            ### monitor_ip
+            if 'monitor_ip' in member_obj:
+                member_optional_params['monitor_ip'] = member_obj['monitor_ip']
 
             _m = PoolMember(ip=member_obj['ip'], 
                             name=member_obj['name'], 
                             weight=member_obj['weight'],
-                            region=region)
+                            **member_optional_params)
             members.append(_m)
 
-        ###########################
-        ### optional parameters ###
-        ###########################
+        ################################
+        ### pool optional parameters ###
+        ################################
         pool_optional_params = {}
 
         ### fallback

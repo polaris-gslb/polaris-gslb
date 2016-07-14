@@ -176,10 +176,16 @@ class Tracker(multiprocessing.Process):
         # indicate that the overall state changed
         self.state_changed = True
         LOG.info('pool member status change: '
-                 'member "{}"({}) of pool "{}" is {}, reason: "{}"'
-                 .format(probe.member_ip, member.name, probe.pool_name, 
-                         state.pool.pprint_status(member.status),
-                         member.status_reason))
+                'member {member_ip}'
+                '(name: {member_name} monitor IP: {monitor_ip}) '
+                'of pool {pool_name} is {member_status}, '
+                'reason: {member_status_reason}'
+                 .format(member_ip=probe.member_ip,
+                         member_name=member.name,
+                         monitor_ip=member.monitor_ip,
+                         pool_name=probe.pool_name, 
+                         member_status=state.pool.pprint_status(member.status),
+                         member_status_reason=member.status_reason))
         # check if this change affects the overall pool's status
         # and generate a log message if it does
         self._change_pool_last_status(self.state.pools[probe.pool_name])
@@ -216,7 +222,8 @@ class Tracker(multiprocessing.Process):
             # issue probe
             probe = Probe(pool_name=pool.name,
                           member_ip=member.ip,
-                          monitor=pool.monitor)
+                          monitor=pool.monitor,
+                          monitor_ip=member.monitor_ip)
 
             self.prober_requests.put(probe) 
 
@@ -230,7 +237,7 @@ class Tracker(multiprocessing.Process):
         pool.last_status is set to pool.status and a log message is generated.
         """
         if pool.last_status != pool.status:
-            LOG.info('pool status change: pool "{}" is {}'.
+            LOG.info('pool status change: pool {} is {}'.
                      format(pool.name, state.pool.pprint_status(pool.status))) 
             pool.last_status = pool.status
 

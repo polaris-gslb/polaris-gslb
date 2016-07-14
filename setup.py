@@ -13,7 +13,7 @@ import shutil
 import setuptools
 
 
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
         version=VERSION,
         author='Anton Gavrik',    
         name='polaris-gslb',
-        description=('A versatile Global Server Load Balancing(GSLB) '
+        description=('A lightweight, extendable Global Server Load Balancing(GSLB) '
                      'solution, DNS-based traffic manager.'),
         packages = setuptools.find_packages('.'),
         install_requires=[
@@ -66,14 +66,13 @@ def main():
                    os.path.join(install_prefix, dirname))
 
 
-    print('Creating /etc/default/polaris...')    
-    py3_bin = which('python3')
+    print('Creating /etc/default/polaris...')
     py3_path = ''
-    if py3_bin is None:
-        print('Unable to find Python3 executable in the $PATH, '
+    if not sys.executable:
+        print('Unable to determine Python3 executable path, '
               'add the path manually to /etc/default/polaris')
     else:
-        py3_path = os.path.split(py3_bin)[0]
+        py3_path = os.path.split(sys.executable)[0]
 
     with open(os.path.join(os.sep, 'etc', 'default', 'polaris'), 'w') as f:
         f.write('export PATH=$PATH:{}\n'.format(py3_path))
@@ -88,24 +87,6 @@ def copy_files(src_dir, dst_dir):
         full_file_name = os.path.join(src_dir, file_name)
         if (os.path.isfile(full_file_name)):
             shutil.copy(full_file_name, dst_dir)
-
-
-def which(program):
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exe(program):
-            return program
-    else:
-        for path in os.environ['PATH'].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
-            if is_exe(exe_file):
-                return exe_file
-
-    return None
 
 
 if __name__ == '__main__':
