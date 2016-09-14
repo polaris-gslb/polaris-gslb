@@ -2,6 +2,39 @@
 # Example configuration
 #
 pools:
+    example.com-pool:
+        monitor: none
+        lb_method: wrr
+        fallback: refuse
+        max_addrs_returned: 2
+        members:
+        - ip: 10.20.30.40
+          name: ns1.example.com
+          weight: 1
+        - ip: 10.20.30.50
+          name: ns2.example.com
+          weight: 1
+
+    glue-ns1.example.com:
+        monitor: none
+        lb_method: wrr
+        fallback: refuse
+        max_addrs_returned: 1
+        members:
+        - ip: 10.20.30.40
+          name: ns1.example.com
+          weight: 1
+
+    glue-ns2.example.com:
+        monitor: none
+        lb_method: wrr
+        fallback: refuse
+        max_addrs_returned: 1
+        members:
+        - ip: 10.20.30.50
+          name: ns2.example.com
+          weight: 1
+
     www-example:
         monitor: http
         monitor_params:
@@ -22,6 +55,20 @@ pools:
           weight: 1
 
 globalnames:
+
+    example.com:
+        pool: example.com-pool
+        ttl: 14400
+        nsrecord: true
+
+    ns1.example.com:
+        pool: glue-ns1.example.com
+        ttl: 14400
+
+    ns2.example.com:
+        pool: glue-ns2.example.com
+        ttl: 14400
+
     www.example.com:
         pool: www-example
         ttl: 1
