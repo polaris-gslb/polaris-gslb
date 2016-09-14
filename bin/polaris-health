@@ -20,11 +20,24 @@ doControl()
     ret=$($POLARIS_CONTROL_CMD $1)
 }
 
+checkConfig()
+{
+        echo "Checking polaris health configuation.."
+        $POLARIS_CONTROL_CMD check-config ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "Configuration check FAILED"
+            exit 1
+        fi
+
+        echo "Configuration is validated."
+}
+
 case "$1" in
     status)
         doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
-        then 
+        then
             echo "not running"
             exit 1
         else
@@ -33,7 +46,9 @@ case "$1" in
     ;;
 
     start)
-        echo -n "Starting Polaris Health... "
+        echo "Starting Polaris Health... "
+
+        checkConfig
 
         # ensure polaris is not already running
         doControl ping 2>/dev/null ; EC=$?
@@ -43,7 +58,7 @@ case "$1" in
             exit 1
         fi
 
-        doControl start        
+        doControl start
         sleep 2
         doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
@@ -55,14 +70,22 @@ case "$1" in
         fi
     ;;
 
+
+    check-config)
+
+        checkConfig
+
+    ;;
+
     start-debug)
         echo "Starting Polaris Health in debug mode... "
+        checkConfig
         $POLARIS_CONTROL_CMD start-debug
     ;;
 
     stop)
-        echo -n "Stopping Polaris Health... "
-        
+        echo "Stopping Polaris Health... "
+
         # ensure polaris is running
         doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
@@ -76,17 +99,20 @@ case "$1" in
     ;;
 
     restart)
-        echo -n "Restarting Polaris Health... "
+        echo "Restarting Polaris Health... "
+
+        checkConfig
 
         # ensure polaris is running
         doControl ping 2>/dev/null ; EC=$?
         if test "$EC" != "0"
         then
-            echo "aborted, not running!"
-            exit 1
+            echo "Polaris is not running, starting.."
+            doControl start
+            exit 0
         fi
 
-        doControl stop  
+        doControl stop
         sleep 2
         doControl start
         sleep 2
@@ -101,7 +127,7 @@ case "$1" in
     ;;
 
     *)
-    echo polaris-health [status\|start\|start-debug\|stop\|restart]
+    echo polaris-health [status\|start\|start-debug\|stop\|restart\|check-config]
     ;;
 
 esac

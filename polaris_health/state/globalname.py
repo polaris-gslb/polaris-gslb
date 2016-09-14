@@ -17,17 +17,17 @@ class GlobalName:
 
     """Load-balnced DNS name"""
 
-    def __init__(self, name, pool_name, ttl):
+    def __init__(self, name, pool_name, ttl, nsrecord):
         """
         args:
             name: str, DNS name to be load-balanced
             pool_name: str, name of a pool to load balance against
             ttl: int, ttl value to return with responses
-        
+
         """
         # name
         self.name = name.lower() # lowcase fqdns
-        if (not isinstance(name, str) or len(name) == 0 
+        if (not isinstance(name, str) or len(name) == 0
                 or len(name) > MAX_NAME_LEN):
             log_msg = ('name "{}" must be a non-empty str, {} chars max'
                        .format(name, MAX_NAME_LEN))
@@ -51,6 +51,8 @@ class GlobalName:
             LOG.error(log_msg)
             raise Error(log_msg)
 
+        self.nsrecord = nsrecord
+
     @classmethod
     def from_config_dict(cls, name, obj):
         """Build a GlobalName object from a config dict.
@@ -65,17 +67,22 @@ class GlobalName:
                        .format(name))
             LOG.error(log_msg)
             raise Error(log_msg)
-         
+
         if 'ttl' not in obj:
             log_msg = ('"{}" is missing a mandatory parameter "ttl"'
                        .format(name))
             LOG.error(log_msg)
             raise Error(log_msg)
- 
-        return cls(name=name, pool_name=obj['pool'], ttl=obj['ttl'])
+
+        if 'nsrecord' not in obj:
+            nsrecord_val=False
+        else:
+            nsrecord_val=obj['nsrecord']
+
+        return cls(name=name, pool_name=obj['pool'], ttl=obj['ttl'], nsrecord=nsrecord_val)
 
     def to_dist_dict(self):
-        """Return a dict representation of the GlobalName required by 
+        """Return a dict representation of the GlobalName required by
         Polaris PDNS to perform distribution.
 
         Example:
@@ -88,6 +95,7 @@ class GlobalName:
         obj = {}
         obj['pool_name'] = self.pool_name
         obj['ttl'] = self.ttl
+        obj['nsrecord'] = self.nsrecord
 
         return obj
 

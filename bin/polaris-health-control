@@ -26,6 +26,7 @@ def main():
                             'start',
                             'start-debug',
                             'stop',
+                            'check-config',
                             ]) 
     opts = parser.parse_args()
 
@@ -47,6 +48,10 @@ class PolarisHealthControl:
 
         # load polaris_health.config
         guardian.Guardian.load_configuration()
+
+    def check_config(self):
+        guardian.Guardian.load_configuration()
+        guardian.Guardian().check()
 
     def ping(self):
         self._send_control_sock_cmd('ping') == 'pong'

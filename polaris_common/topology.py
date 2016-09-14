@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from netaddr import *
 import ipaddress
 
-
-__all__ = [ 
+__all__ = [
     'config_to_map',
     'Resolver',
 ]
@@ -72,12 +72,21 @@ def get_region(ip_str, topology_map):
 
     raises:
         ValueError: raised by ipaddress if ip_str isn't a valid IP address
-    """ 
-    ip = ipaddress.ip_address(ip_str)
+    """
 
-    for net in topology_map:
-        if ip in net:
-            return topology_map[net]
+    ip = IPAddress(ip_str)
+    keylist_objects = list(topology_map.keys())
+    keylist = []
+    for value in keylist_objects:
+        keylist.append(str(value))
+
+    match = all_matching_cidrs(ip, keylist)
+
+    clean = sorted(match)
+
+    subnet = ipaddress.IPv4Network(clean[-1])
+
+    if subnet:
+        return topology_map[subnet]
 
     return None
-

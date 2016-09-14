@@ -119,6 +119,32 @@ class Guardian:
             if topology_config:
                 config.TOPOLOGY_MAP = topology.config_to_map(topology_config)
 
+    def check(self):
+        """Function to validate configuration
+        """
+        polaris_health.util.log.setup()
+
+        LOG.info('check Polaris health configuration')
+
+        # probe requests are put on this queue by Tracker
+        # to be consumed by Prober processes
+        self._prober_requests = multiprocessing.Queue()
+
+        # processed probes are put on this queue by Prober processes to be
+        # consumed by Tracker
+        self._prober_responses = multiprocessing.Queue()
+
+        # instantiate Tracker, this will also validate the configuration
+        p = tracker.Tracker(prober_requests=self._prober_requests,
+                            prober_responses=self._prober_responses)
+        self._processes.append(p)
+
+        # instantiate Probers
+        for i in range(config.BASE['NUM_PROBERS']):
+            p = prober.ProberProcess(prober_requests=self._prober_requests,
+                                     prober_responses=self._prober_responses)
+            self._processes.append(p)
+
     def start(self, debug=False):
         """Start Polaris health.
 

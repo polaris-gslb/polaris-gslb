@@ -59,9 +59,11 @@ class BaseMonitor:
 
 from .http import HTTP
 from .tcp import TCP
+from .none import NONE
 
 registered = {
     'http': HTTP,
     'tcp': TCP,
+    'none': NONE,
 }            
 

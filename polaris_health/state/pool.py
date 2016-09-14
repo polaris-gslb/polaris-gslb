@@ -17,7 +17,7 @@ MAX_POOL_MEMBER_NAME_LEN = 256
 MAX_POOL_MEMBER_WEIGHT = 99
 MAX_POOL_NAME_LEN = 256
 MAX_REGION_LEN = 256
-MAX_MAX_ADDRS_RETURNED = 32
+MAX_MAX_ADDRS_RETURNED = 100
 
 
 def pprint_status(status):
@@ -44,7 +44,7 @@ class PoolMember:
             name: string, name of the server
             weight: int, weight of the server, if set to 0 the server
                 is disabled
-            region: string, id of the region, used in topology-based 
+            region: string, id of the region, used in topology-based
                 distribution
         """
         ### ip
@@ -72,8 +72,8 @@ class PoolMember:
         else:
             self.name = name
 
-        ### weight    
-        if (not isinstance(weight, int) or weight < 0 
+        ### weight
+        if (not isinstance(weight, int) or weight < 0
                 or weight > MAX_POOL_MEMBER_WEIGHT):
             log_msg = ('"{}" weight "{}" must be an int between 0 and {}'.
                        format(name, weight, MAX_POOL_MEMBER_WEIGHT))
@@ -82,15 +82,15 @@ class PoolMember:
             self.weight = weight
 
         ### region
-        if (not region is None 
-                and (not isinstance(region, (str)) 
+        if (not region is None
+                and (not isinstance(region, (str))
                  or len(region) > MAX_REGION_LEN)):
             log_msg = ('"{}" region "{}" must be a str, {} chars max'.
                        format(name, region, MAX_POOL_MEMBER_NAME_LEN))
             LOG.error(log_msg)
             raise Error(log_msg)
         else:
-            self.region = region          
+            self.region = region
 
         # curent status of the server
         # None = new, True = up, False = down
@@ -133,7 +133,7 @@ class Pool:
         """
         ### name
         self.name = name
-        if (not isinstance(name, str) 
+        if (not isinstance(name, str)
                 or len(name) > MAX_POOL_NAME_LEN):
             log_msg = ('"{}" name must be a str, {} chars max'.
                        format(name, MAX_POOL_NAME_LEN))
@@ -148,38 +148,38 @@ class Pool:
 
         ### lb_method
         self.lb_method = lb_method
-        if (not isinstance(lb_method, str) 
+        if (not isinstance(lb_method, str)
                 or lb_method not in self.LB_METHOD_OPTIONS):
             _lb_methods = ', '.join(self.LB_METHOD_OPTIONS)
             log_msg = ('lb_method "{}" must be a str one of {}'.
-                       format(lb_method, _lb_methods)) 
-            LOG.error(log_msg)         
+                       format(lb_method, _lb_methods))
+            LOG.error(log_msg)
             raise Error(log_msg)
 
         ### fallback
         self.fallback = fallback
-        if (not isinstance(fallback, str) 
+        if (not isinstance(fallback, str)
                 or fallback not in self.FALLBACK_OPTIONS):
             _fallbacks = ', '.join(self.FALLBACK_OPTIONS)
             log_msg = ('fallback "{}" must be a str one of {}'.
                        format(fallback, _fallbacks))
-            LOG.error(log_msg)         
+            LOG.error(log_msg)
             raise Error(log_msg)
 
         # max_addrs_returned
         self.max_addrs_returned = max_addrs_returned
-        if (not isinstance(max_addrs_returned, int) or max_addrs_returned < 1 
+        if (not isinstance(max_addrs_returned, int) or max_addrs_returned < 1
                 or max_addrs_returned > MAX_MAX_ADDRS_RETURNED):
             log_msg = ('"{}" max_addrs_returned "{}" must be an int '
                        'between 1 and {}'
-                       .format(name, max_addrs_returned, 
+                       .format(name, max_addrs_returned,
                                MAX_MAX_ADDRS_RETURNED))
             raise Error(log_msg)
 
         # last known status None, True, False
         self.last_status = None
 
-    ########################   
+    ########################
     ### public interface ###
     ########################
     @property
@@ -188,7 +188,7 @@ class Pool:
 
         Read-only property based on health status of the pool members.
 
-        Return True if any member of the pool with a non-0 weight is UP, 
+        Return True if any member of the pool with a non-0 weight is UP,
         False otherwise.
         """
         for member in self.members:
@@ -226,7 +226,7 @@ class Pool:
             monitor_params = obj['monitor_params']
         else:
             monitor_params = {}
-                 
+
         monitor = monitors.registered[monitor_name](**monitor_params)
 
         ### lb_method
@@ -238,12 +238,12 @@ class Pool:
         # validate "members" key is present and not empty
         if not 'members' in obj or not obj['members']:
             log_msg = ('configuration dictionary must contain '
-                       'a non-empty "members" list')    
+                       'a non-empty "members" list')
             LOG.error(log_msg)
             raise Error(log_msg)
 
         for member_obj in obj['members']:
-            # ensure a member with the same IP doesn't exist already 
+            # ensure a member with the same IP doesn't exist already
             for _m in members:
                 if member_obj['ip'] == _m.ip:
                     log_msg = 'duplicate member IP {}'.format(member_obj['ip'])
@@ -257,12 +257,12 @@ class Pool:
                     member_obj['ip'], config.TOPOLOGY_MAP)
                 if not region:
                     log_msg  = ('unable to determine region for member {}({})'
-                                .format(member_obj['ip'], member_obj['name'])) 
+                                .format(member_obj['ip'], member_obj['name']))
                     LOG.error(log_msg)
                     raise Error(log_msg)
 
-            _m = PoolMember(ip=member_obj['ip'], 
-                            name=member_obj['name'], 
+            _m = PoolMember(ip=member_obj['ip'],
+                            name=member_obj['name'],
                             weight=member_obj['weight'],
                             region=region)
             members.append(_m)
@@ -294,14 +294,14 @@ class Pool:
 
         "_default" distribution table is always built.
 
-        Region-specific distribution tables are built only if the pool is using 
+        Region-specific distribution tables are built only if the pool is using
         a topology lb method and has an UP member.
 
         Example:
             {
                 'status' : True,
                 'lb_method': 'twrr',
-                'fallback': 'any', 
+                'fallback': 'any',
                 'max_addrs_returned': 1,
                 'dist_tables': {
                     '_default': {
@@ -329,7 +329,7 @@ class Pool:
         ### status
         obj['status'] = self.status
 
-        ### lb_method  
+        ### lb_method
         obj['lb_method'] = self.lb_method
 
         ### fallback
@@ -339,13 +339,14 @@ class Pool:
         obj['max_addrs_returned'] = self.max_addrs_returned
 
         ### distribution tables
-        dist_tables = {} 
+        dist_tables = {}
 
         # always build the _default distribution table
         dist_tables['_default'] = {}
         dist_tables['_default']['rotation'] = []
+        dist_tables['_default']['names'] = []
         dist_tables['_default']['num_unique_addrs'] = 0
-       
+
         ##################
         ### pool is UP ###
         ##################
@@ -363,14 +364,15 @@ class Pool:
                 # add to the _default table
                 #
 
-                # add the member IP times it's weight into 
+                # add the member IP times it's weight into
                 # the _default distribution table
                 for i in range(member.weight):
                     dist_tables['_default']['rotation'].append(member.ip)
+                    dist_tables['_default']['names'].append(member.name)
 
                 # increase the number of unique addresses in the _default by 1
                 dist_tables['_default']['num_unique_addrs'] += 1
-       
+
                 # if lb_method is failover group do not add any more members
                 if self.lb_method == 'fogroup':
                     break
@@ -379,8 +381,8 @@ class Pool:
                 # add to a regional table
                 #
 
-                # if a topology lb method is used, add the member's IP 
-                # to a corresponding regional table 
+                # if a topology lb method is used, add the member's IP
+                # to a corresponding regional table
                 if self.lb_method == 'twrr':
                     # create the regional table if it does not exist
                     if member.region not in dist_tables:
@@ -422,16 +424,15 @@ class Pool:
         ##################################
         for name in dist_tables:
             # randomly shuffle the rotation list
-            random.shuffle(dist_tables[name]['rotation']) 
-       
+            random.shuffle(dist_tables[name]['rotation'])
+
             # create index used by ppdns for distribution,
             # set it to a random position, when ppdns is
             # syncing its internal state from shared memory, indexes gets
             # reset, we want to avoid starting from 0 every time
             dist_tables[name]['index'] = \
-                int(random.random() * len(dist_tables[name]['rotation'])) 
+                int(random.random() * len(dist_tables[name]['rotation']))
 
         obj['dist_tables'] = dist_tables
 
         return obj
-

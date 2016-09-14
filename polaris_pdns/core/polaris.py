@@ -12,18 +12,18 @@ from .remotebackend import RemoteBackend
 
 __all__ = [ 'Polaris' ]
 
-# minimum number of seconds between syncing distribution state from shared mem 
+# minimum number of seconds between syncing distribution state from shared mem
 STATE_SYNC_INTERVAL = 1
 
 
 class Polaris(RemoteBackend):
-    
+
     """Polaris PDNS remote backend.
 
     Distribute queries according to the distribution state and the load
     balancing method.
     """
-    
+
     def __init__(self):
         super(Polaris, self).__init__()
 
@@ -42,7 +42,7 @@ class Polaris(RemoteBackend):
         self._state_timestamp = 0
 
         # time when the state was last synced from shared memory
-        # init with 0 for comparison in _sync_state() to work 
+        # init with 0 for comparison in _sync_state() to work
         self._state_last_synced = 0
 
     def do_lookup(self, params):
@@ -91,7 +91,7 @@ class Polaris(RemoteBackend):
         # get a pool associated with the qname
         pool_name = self._state['globalnames'][qname]['pool_name']
         pool = self._state['pools'][pool_name]
-       
+
         # use the _default distribution table by default
         dist_table = pool['dist_tables']['_default']
 
@@ -108,7 +108,7 @@ class Polaris(RemoteBackend):
 
                 # lookup the client's region, get_region() will
                 # return None if the region cannot be determined
-                region = topology.get_region(params['remote'], 
+                region = topology.get_region(params['remote'],
                                              config.TOPOLOGY_MAP)
 
                 # log the time taken to perform the lookup
@@ -118,7 +118,7 @@ class Polaris(RemoteBackend):
                 # log client's region
                 self.log.append('client region: {}'.format(region))
 
-                # if we have a region table corresponding 
+                # if we have a region table corresponding
                 # to the client's region - use it
                 if region in pool['dist_tables']:
                     dist_table = pool['dist_tables'][region]
@@ -136,15 +136,15 @@ class Polaris(RemoteBackend):
             # otherwise(fallback is "any") use the _default distribution table
 
         # log the distribution table used
-        self.log.append('dist table used: {}'
+        self.log.append(' dist table used: {}'
                         .format(json.dumps(dist_table)))
 
         # determine how many records to return
-        # which is the minimum of the dist table's num_unique_addrs and 
+        # which is the minimum of the dist table's num_unique_addrs and
         # the pool's max_addrs_returned
-        if dist_table['num_unique_addrs'] <= pool['max_addrs_returned']: 
+        if dist_table['num_unique_addrs'] <= pool['max_addrs_returned']:
             num_records_return = dist_table['num_unique_addrs']
-        else:    
+        else:
             num_records_return = pool['max_addrs_returned']
 
         # if we don't have anything to return(all member weights may have
@@ -153,14 +153,30 @@ class Polaris(RemoteBackend):
             self.result = False
             return
 
+        ### add NS records to the response if required###
+        if self._state['globalnames'][qname]['nsrecord']:
+            for i in range(num_records_return):
+                # add record to the response
+                self.add_record(qtype='NS',
+                            # use the original qname from the parameters dict
+                            qname=params['qname'],
+                            content=dist_table['names'][dist_table['index']],
+                            ttl=self._state['globalnames'][qname]['ttl'])
+
+                # increase index
+                dist_table['index'] += 1
+                # set the index to 0 if we reached the end of the rotation list
+                if dist_table['index'] >= len(dist_table['rotation']):
+                    dist_table['index'] = 0
+
         ### add records to the response ###
         for i in range(num_records_return):
             # add record to the response
             self.add_record(qtype='A',
-                            # use the original qname from the parameters dict        
+                            # use the original qname from the parameters dict
                             qname=params['qname'],
                             content=dist_table['rotation'][dist_table['index']],
-                            ttl=self._state['globalnames'][qname]['ttl'])    
+                            ttl=self._state['globalnames'][qname]['ttl'])
 
             # increase index
             dist_table['index'] += 1
@@ -181,11 +197,11 @@ class Polaris(RemoteBackend):
 
         # append ns with a dot here
         ns = '{}.'.format(config.BASE['HOSTNAME'])
-        contact = 'hostmaster.{}'.format(ns)                  
+        contact = 'hostmaster.{}'.format(ns)
         content = ('{ns} {contact} {serial} {retry} {expire} {min_ttl}'.
                    format(ns=ns,
                           contact=contact,
-                          serial=1,
+                          serial=808,
                           retry=600,
                           expire=86400,
                           min_ttl=1))
@@ -195,7 +211,7 @@ class Polaris(RemoteBackend):
                         # use the original qname from parameters dict
                         qname=params['qname'],
                         content=content,
-                        ttl=60)
+                        ttl=86400)
 
     def _sync_state(self):
         """Synchronize the local distribution state from shared memory.
@@ -229,4 +245,3 @@ class Polaris(RemoteBackend):
 
         # update _state_last_synced
         self._state_last_synced = t
-
