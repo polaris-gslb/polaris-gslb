@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-
 import argparse
 import socket
 import sys
 
 import daemon
 
-from  polaris_health import config, guardian
+from polaris_health import config, guardian, state
 
 
 # minimum version of python3 required
@@ -17,46 +15,39 @@ MINIMUM_PY3_VERSION = (3, 4, 3)
 CONTROL_SOCKET_RECV_BUFF_SIZE = 256
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Polaris health control")
-    parser.add_argument('action',
-                        choices=[
-                            'ping',
-                            'start',
-                            'start-debug',
-                            'stop',
-                            ]) 
-    opts = parser.parse_args()
-
-    phc = PolarisHealthControl()
-
-    method = opts.action.replace('-', '_')
-    getattr(phc, method)()
-
-
 class PolarisHealthControl:
 
     def __init__(self):
         # check for the minimum required py3 version
         if sys.version_info < MINIMUM_PY3_VERSION:
-            min_version_str = '.'.join([ str(MINIMUM_PY3_VERSION[i]) 
+            min_version_str = '.'.join([str(MINIMUM_PY3_VERSION[i]) 
                            for i in range(len(MINIMUM_PY3_VERSION))])
             raise Exception('Python version {} or later is required'.
                             format(min_version_str))
 
-        # load polaris_health.config
-        guardian.Guardian.load_configuration()
+        # load and validate the configuration    
+        try:    
+            # load polaris_health.config
+            guardian.Guardian.load_configuration()
+            # validate the LB configuration
+            state.State(config_obj=config.LB)
+        except Exception as e:
+            sys.stderr.write("Configuration validation failed: {}\n".format(e))
+            exit(1)
 
     def ping(self):
-        self._send_control_sock_cmd('ping') == 'pong'
+        try:
+            self._send_control_sock_cmd('ping') == 'pong'
+        except:
+            exit(1)
         
     def start(self, debug=False):
         """In debug the app will not daemonize, logging level is set to debug,
-        logs are sent to stdout
+        logs are sent to stdout.
         """
         if self._is_running():
-            raise Exception('Polaris health is already running')
+            sys.stderr.write('Polaris Health is already running.\n')
+            exit(1)
 
         if debug:
             guardian.Guardian().start(debug=True)
@@ -70,7 +61,8 @@ class PolarisHealthControl:
 
     def stop(self):
         if not self._is_running(): 
-            raise Exception('Polaris health is not running')
+            sys.stderr.write('Polaris health is not running.\n')
+            exit(1)
 
         self._send_control_sock_cmd('stop')
 
@@ -94,5 +86,19 @@ class PolarisHealthControl:
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(
+        description="Polaris health control")
+    parser.add_argument('action',
+                        choices=[
+                            'ping',
+                            'start',
+                            'start-debug',
+                            'stop',
+                            'validate-lb-config',
+                            ]) 
+    opts = parser.parse_args()
 
+    phc = PolarisHealthControl()
+
+    method = opts.action.replace('-', '_')
+    getattr(phc, method)()

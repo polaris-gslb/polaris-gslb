@@ -20,88 +20,86 @@ doControl()
     ret=$($POLARIS_CONTROL_CMD $1)
 }
 
+doStatus()
+{
+    doControl ping ; EC=$?
+    if test "$EC" != "0"
+    then 
+        echo "Not running or error."
+        exit 1
+    else
+        echo "Running."
+    fi
+}
+
+doStart()
+{
+    echo "Starting Polaris Health... "
+
+    doControl start ; EC=$?
+    if test "$EC" != "0"
+    then
+        exit 1
+    fi
+
+    sleep 2
+
+    doControl ping  ; EC=$?
+    if test "$EC" != "0"
+    then
+        echo "Failed to start."
+        exit 1
+    else
+        echo "Started."
+    fi 
+}
+
+doStop()
+{
+    echo "Stopping Polaris Health... "
+
+    doControl stop ; EC=$?
+    if test "$EC" != "0"
+    then
+        exit 1
+    else
+        sleep 2
+        doControl ping  ; EC=$?
+        if test "$EC" != "0"
+        then
+            echo "Stopped."
+        else
+            echo "Failed to stop."
+            exit 1
+        fi
+    fi
+}
+
 case "$1" in
     status)
-        doControl ping 2>/dev/null ; EC=$?
-        if test "$EC" != "0"
-        then 
-            echo "not running"
-            exit 1
-        else
-            echo "running"
-        fi
+        doStatus
     ;;
 
     start)
-        echo -n "Starting Polaris Health... "
-
-        # ensure polaris is not already running
-        doControl ping 2>/dev/null ; EC=$?
-        if test "$EC" = "0"
-        then
-            echo "aborted, already running!"
-            exit 1
-        fi
-
-        doControl start        
-        sleep 2
-        doControl ping 2>/dev/null ; EC=$?
-        if test "$EC" != "0"
-        then
-            echo "failed to start!"
-            exit 1
-        else
-            echo "done."
-        fi
+        doStart
     ;;
 
     start-debug)
         echo "Starting Polaris Health in debug mode... "
-        $POLARIS_CONTROL_CMD start-debug
+
+        doControl start-debug
     ;;
 
     stop)
-        echo -n "Stopping Polaris Health... "
-        
-        # ensure polaris is running
-        doControl ping 2>/dev/null ; EC=$?
-        if test "$EC" != "0"
-        then
-            echo "aborted, not running!"
-            exit 1
-        fi
-
-        doControl stop
-        echo "done."
+        doStop
     ;;
 
     restart)
-        echo -n "Restarting Polaris Health... "
-
-        # ensure polaris is running
-        doControl ping 2>/dev/null ; EC=$?
-        if test "$EC" != "0"
-        then
-            echo "aborted, not running!"
-            exit 1
-        fi
-
-        doControl stop  
-        sleep 2
-        doControl start
-        sleep 2
-        doControl ping 2>/dev/null ; EC=$?
-        if test "$EC" != "0"
-        then
-            echo "failed to start!"
-            exit 1
-        else
-            echo "done."
-        fi
+        doStop
+        doStart
     ;;
-
+        
     *)
-    echo polaris-health [status\|start\|start-debug\|stop\|restart]
+        echo "polaris-health [status\|start\|start-debug\|stop\|restart]"
     ;;
-
 esac
