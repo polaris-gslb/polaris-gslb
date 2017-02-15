@@ -278,6 +278,7 @@ class Guardian:
             if cmd == 'ping':
                 conn.sendall('pong'.encode())
             elif cmd == 'stop':
+                conn.sendall('ok'.encode())
                 self._terminate_child_procs()
             else:
                 LOG.warning('unknown control socket command received "{}"'

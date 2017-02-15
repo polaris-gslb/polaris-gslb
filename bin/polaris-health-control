@@ -36,9 +36,7 @@ class PolarisHealthControl:
             exit(1)
 
     def ping(self):
-        try:
-            self._send_control_sock_cmd('ping') == 'pong'
-        except:
+        if not self._is_running():
             exit(1)
         
     def start(self, debug=False):
@@ -64,7 +62,16 @@ class PolarisHealthControl:
             sys.stderr.write('Polaris health is not running.\n')
             exit(1)
 
-        self._send_control_sock_cmd('stop')
+        try:
+            resp = self._send_control_sock_cmd('stop')
+            if resp != 'ok':
+                sys.stderr.write('Unexpected response from Polaris Health: {}\n'
+                                 .format(resp))
+                exit(1)
+        except OSError as e:
+            sys.stderr.write('Failed to send the stop command to Polaris Health: {}\n'
+                             .format(e))
+            exit(1)
 
     def _is_running(self):
         try:
