@@ -2,6 +2,7 @@
 
 import time
 import json
+import threading 
 
 import memcache
 
@@ -12,67 +13,110 @@ from .remotebackend import RemoteBackend
 
 __all__ = [ 'Polaris' ]
 
-# minimum number of seconds between syncing distribution state from shared mem 
-STATE_SYNC_INTERVAL = 1
+# distribution state
+STATE = {}
+# distribution state lock
+STATE_LOCK = threading.Lock() 
+# minimum number of seconds between updating distribution state from shared mem 
+STATE_UPDATE_INTERVAL = 1
+
+
+class StateUpdater(threading.Thread):
+    
+    """StateUpdater updates the global distribution state from shared memory
+    on a predefined interval.
+    State timestamp only is fetched first, compared to the current timestamp 
+    and, if different, full state if fetched and made active.
+    """
+
+    def __init__(self):
+        super(StateUpdater, self).__init__()
+
+        # shared memory client
+        self.sm = sharedmem.MemcacheClient(
+            [config.BASE['SHARED_MEM_HOSTNAME']],
+            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'])
+
+        # current state timestamp
+        self.state_ts = 0
+
+    def run(self):
+        while True:
+            # attempt to update state as soon as we start
+            self.update_state()
+            time.sleep(STATE_UPDATE_INTERVAL)
+
+    def update_state(self):      
+        # fetch state timestamp
+        state_ts = self.sm.get(config.BASE['SHARED_MEM_STATE_TIMESTAMP_KEY'])
+
+        # failed ot fetch the timestamp, do nothing
+        if state_ts is None:
+            return
+
+        # if the fetched timestamp is the same as the current timestamp do nothing
+        if state_ts == self.state_ts:
+            return
+
+        # get a distribution state from shared memory
+        state = self.sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
+
+        # failed ot fetch the state, do nothing
+        if state is None:
+            return
+
+        # update STATE
+        global STATE, STATE_LOCK
+
+        with STATE_LOCK.aquire():
+            # point STATE to the fetched state
+            STATE = state
+
+            # update state's timestamp
+            self.state_ts = state_ts
 
 
 class Polaris(RemoteBackend):
     
     """Polaris PDNS remote backend.
 
-    Distribute queries according to the distribution state and the load
+    Distribute queries according to distribution state and load
     balancing method.
     """
     
     def __init__(self):
         super(Polaris, self).__init__()
 
-        # shared memory client
-        self._sm = sharedmem.MemcacheClient(
-            [config.BASE['SHARED_MEM_HOSTNAME']],
-            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'])
-
-        # this will hold the distribution state
-        self._state = {}
-
-        # used to determine whether we need to set self._state
-        # to the state we pull from shared memory(every STATE_SYNC_INTERVAL)
-        # initialize with 0 as it will be used for comparison
-        # in self._sync_state on it's first run
-        self._state_timestamp = 0
-
-        # time when the state was last synced from shared memory
-        # init with 0 for comparison in _sync_state() to work 
-        self._state_last_synced = 0
+        # start the StateUpdater thread
+        StateUpdater().start()
 
     def do_lookup(self, params):
         """
         args:
             params: 'parameters' dict from PowerDNS JSON API request
         """
-        # sync(if required) state from the shared memory
-        self._sync_state()
+        global STATE_LOCK
+        with STATE_LOCK:
+            # respond with False if there is no globalname corresponding
+            # to the qname, this will result in REFUSED in the front-end
+            if params['qname'].lower() not in STATE['globalnames']:
+                self.log.append(
+                    'no globalname found for qname "{}"'.format(params['qname']))
+                self.result = False
+                return
 
-        # respond with False if there is no globalname corresponding
-        # to the qname, this will result in REFUSED in the front-end
-        if params['qname'].lower() not in self._state['globalnames']:
-            self.log.append(
-                'no globalname found for qname "{}"'.format(params['qname']))
+            # ANY/A response
+            if params['qtype'] == 'ANY' or params['qtype'] == 'A':
+                self._any_response(params)
+                return
+
+            # SOA response
+            if params['qtype'] == 'SOA':
+                self._soa_response(params)
+                return
+
+            # REFUSE otherwise
             self.result = False
-            return
-
-        # ANY/A response
-        if params['qtype'] == 'ANY' or params['qtype'] == 'A':
-            self._any_response(params)
-            return
-
-        # SOA response
-        if params['qtype'] == 'SOA':
-            self._soa_response(params)
-            return
-
-        # REFUSE otherwise
-        self.result = False
 
     def do_getDomainMetadata(self, params):
         """PDNS seems to ask for this quite a bit,
@@ -89,8 +133,8 @@ class Polaris(RemoteBackend):
         qname = params['qname'].lower()
 
         # get a pool associated with the qname
-        pool_name = self._state['globalnames'][qname]['pool_name']
-        pool = self._state['pools'][pool_name]
+        pool_name = STATE['globalnames'][qname]['pool_name']
+        pool = STATE['pools'][pool_name]
        
         # use the _default distribution table by default
         dist_table = pool['dist_tables']['_default']
@@ -160,7 +204,7 @@ class Polaris(RemoteBackend):
                             # use the original qname from the parameters dict        
                             qname=params['qname'],
                             content=dist_table['rotation'][dist_table['index']],
-                            ttl=self._state['globalnames'][qname]['ttl'])    
+                            ttl=STATE['globalnames'][qname]['ttl'])    
 
             # increase index
             dist_table['index'] += 1
@@ -173,8 +217,8 @@ class Polaris(RemoteBackend):
         # if pool is DOWN and fallback is set to "refuse", refuse SOA queries
         # when both SOA any ANY results in False the pdns will produce a REFUSE
         qname = params['qname'].lower()
-        pool_name = self._state['globalnames'][qname]['pool_name']
-        pool = self._state['pools'][pool_name]
+        pool_name = STATE['globalnames'][qname]['pool_name']
+        pool = STATE['pools'][pool_name]
         if not pool['status'] and pool['fallback'] == 'refuse':
             self.result = False
             return
@@ -197,36 +241,4 @@ class Polaris(RemoteBackend):
                         content=content,
                         ttl=60)
 
-    def _sync_state(self):
-        """Synchronize the local distribution state from shared memory.
-        """
-        t = time.time()
-
-        # do not sync state if STATE_SYNC_INTERVAL seconds haven't passed
-        # since the last sync
-        if t - self._state_last_synced < STATE_SYNC_INTERVAL:
-            return
-
-        # get the distribution state object from shared memory
-        sm_state = self._sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
-
-        # failed to get state from shared mem - ignore silently,
-        # continue to use the in-memory state
-        if sm_state is None:
-            return
-
-        # check timestamp on it, if it did not change since the last pull
-        # do not update the local memory state to avoid resetting
-        # rotation indexes needlessly
-        if self._state_timestamp == sm_state['timestamp']:
-            return
-
-        # otherwise make the shared memory state fetched the self._state
-        self._state = sm_state
-
-        # update self._state_timestamp
-        self._state_timestamp = sm_state['timestamp']
-
-        # update _state_last_synced
-        self._state_last_synced = t
-
+       

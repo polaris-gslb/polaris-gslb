@@ -3,6 +3,7 @@
 import logging
 import time
 import multiprocessing
+import threading
 import queue
 
 import memcache
@@ -21,6 +22,76 @@ PROBE_RESPONSES_QUEUE_WAIT =  0.05 # 50 ms
 # how often to issue new probe requests and sync state to shared mem(but only
 # if state change occurred)
 SCAN_STATE_INTERVAL = 1 # 1s
+
+STATE = state.State(config_obj={})
+STATE_LOCK = threading.Lock()
+STATE_TIMESTAMP = 0
+STATE_PUSH_INTERVAL = 1
+
+class StatePusher(threading.Thread):
+    
+    """StatePusher pushes state updates into shared memory.
+    """
+
+    def __init__(self):
+        super(StatePusher, self).__init__()
+
+        # shared memory client
+        self._sm = sharedmem.MemcacheClient(
+            [config.BASE['SHARED_MEM_HOSTNAME']],
+            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
+            server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
+
+        # last pushed state timestamp
+        self.state_ts = 0
+
+        self.last_push_ok = False
+
+    def run(self):
+        while True:
+            if STATE_TIMESTAMP != self.state_ts:
+                self.push_states()
+            time.sleep(STATE_PUSH_INTERVAL)
+
+    def push_states(self):      
+          # all memcache pushes must succeed in order to
+            # reset state changed flag
+            pushes_ok = 0
+
+            # push PPDNS distribution form of the state
+            val = self._sm.set(
+                config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
+                self.state.to_dist_dict())
+            if val is True:
+                pushes_ok += 1
+            else:    
+                log_msg = ('failed to write ppdns '
+                           'state to the shared memory')
+                LOG.warning(log_msg)
+
+            # push generic form of the state
+            obj = util.instance_to_dict(self.state)
+            # add epoch time timestampt to the object
+            obj['timestamp'] = time.time()
+            val = self._sm.set(
+                config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
+                obj)
+            if val is True:
+                pushes_ok += 1
+            else:
+                log_msg = ('failed to write generic '
+                           'state to the shared memory')
+                LOG.warning(log_msg)
+
+            # if all memcache pushes are successful reset 
+            # state changed flag, otherwise keep it as True
+            # so a push is attempted on the next iteration
+            if pushes_ok == 2:
+                LOG.debug('synced state to the shared memory')
+                # reset state changed flag
+                self.state_changed = False
+
+
 
 class Tracker(multiprocessing.Process):
 
@@ -43,12 +114,6 @@ class Tracker(multiprocessing.Process):
 
         # create health state table from the lb config
         self.state = state.State(config_obj=config.LB)
-
-        # shared memory client
-        self._sm = sharedmem.MemcacheClient(
-            [config.BASE['SHARED_MEM_HOSTNAME']],
-            socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
-            server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
 
     def run(self):
         """Main execution loop"""
@@ -80,48 +145,15 @@ class Tracker(multiprocessing.Process):
                 # update last scan state time
                 last_scan_state_time = time.time()
 
-                # if the state changed, push it to the shared memory
+                # if the state changed, update STATE_TIMESTAMP
+                # and reset self.state_changed
                 if self.state_changed:
+                    global STATE_TIMESTAMP
+                    STATE_TIMESTAMP = time.time()
+                    self.state_changed = False
 
-                    # all memcache pushes must succeed in order to
-                    # reset state changed flag
-                    pushes_ok = 0
-
-                    # push PPDNS distribution form of the state
-                    val = self._sm.set(
-                        config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
-                        self.state.to_dist_dict())
-                    if val is True:
-                        pushes_ok += 1
-                    else:    
-                        log_msg = ('failed to write ppdns '
-                                   'state to the shared memory')
-                        LOG.warning(log_msg)
-
-                    # push generic form of the state
-                    obj = util.instance_to_dict(self.state)
-                    # add epoch time timestampt to the object
-                    obj['timestamp'] = time.time()
-                    val = self._sm.set(
-                        config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
-                        obj)
-                    if val is True:
-                        pushes_ok += 1
-                    else:
-                        log_msg = ('failed to write generic '
-                                   'state to the shared memory')
-                        LOG.warning(log_msg)
-
-                    # if all memcache pushes are successful reset 
-                    # state changed flag, otherwise keep it as True
-                    # so a push is attempted on the next iteration
-                    if pushes_ok == 2:
-                        LOG.debug('synced state to the shared memory')
-                        # reset state changed flag
-                        self.state_changed = False
- 
-                # iterate the state, issue new probe requests
-                self._scan_state()
+                    # iterate the state, issue new probe requests
+                    self._scan_state()
 
     def _process_probe(self, probe):
         """Process probe, change the associated member status accordingly.
