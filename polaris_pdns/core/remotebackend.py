@@ -40,8 +40,15 @@ class RemoteBackend:
     ### public interface ###
     ########################
     def run(self):
-        """Start the main loop execution"""
+        # run additonal startup tasks if defined by a child class
+        self.run_additional_startup_tasks()
+
+        # start the main loop execution
         self.__main_loop()
+
+    def run_additional_startup_tasks(self):
+        """Can be overwritten by a child class"""
+        return
 
     def add_record(self, qtype, qname, content, ttl):
         """Add a record to the response (self.result)

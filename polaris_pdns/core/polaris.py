@@ -17,8 +17,8 @@ __all__ = [ 'Polaris' ]
 STATE = {}
 # distribution state lock
 STATE_LOCK = threading.Lock() 
-# minimum number of seconds between updating distribution state from shared mem 
-STATE_UPDATE_INTERVAL = 1
+# how long to sleep after attempting a state update
+STATE_UPDATE_INTERVAL = 0.5
 
 
 class StateUpdater(threading.Thread):
@@ -31,6 +31,10 @@ class StateUpdater(threading.Thread):
 
     def __init__(self):
         super(StateUpdater, self).__init__()
+
+        # flag the thread as daemon so it's abruptly killed
+        # when its parent process exists
+        self.daemon = True
 
         # shared memory client
         self.sm = sharedmem.MemcacheClient(
@@ -58,7 +62,7 @@ class StateUpdater(threading.Thread):
         if state_ts == self.state_ts:
             return
 
-        # get a distribution state from shared memory
+        # get distribution form of state from shared memory
         state = self.sm.get(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'])
 
         # failed ot fetch the state, do nothing
@@ -68,7 +72,7 @@ class StateUpdater(threading.Thread):
         # update STATE
         global STATE, STATE_LOCK
 
-        with STATE_LOCK.aquire():
+        with STATE_LOCK:
             # point STATE to the fetched state
             STATE = state
 
@@ -87,7 +91,16 @@ class Polaris(RemoteBackend):
     def __init__(self):
         super(Polaris, self).__init__()
 
-        # start the StateUpdater thread
+    def run_additional_startup_tasks(self):
+        """In order for global variables to work correctly 
+        between StateUpdater and Polaris RemoteBackend,
+        StateUpdater thread must be started not from __init__.
+        """
+        # attempt to update state once so we have a state before 
+        # starting to answer queries 
+        StateUpdater().update_state()
+
+        # start the StateUpdater as a thread
         StateUpdater().start()
 
     def do_lookup(self, params):

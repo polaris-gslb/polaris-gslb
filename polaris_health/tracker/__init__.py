@@ -12,21 +12,28 @@ from polaris_common import sharedmem
 from polaris_health import config, state, util
 from polaris_health.prober.probe import Probe
 
+
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.NullHandler())
 
 # how long to wait(block) when reading from probe response queue
 # non-blocking will eat 100% cpu at low message rate
-PROBE_RESPONSES_QUEUE_WAIT =  0.05 # 50 ms
+PROBE_RESPONSES_QUEUE_WAIT =  0.050
 
-# how often to issue new probe requests and sync state to shared mem(but only
-# if state change occurred)
+# how often to scan the state(and issue probe requests)
 SCAN_STATE_INTERVAL = 1 # 1s
 
-STATE = state.State(config_obj={})
+# the main load balancing state, initialized in Tracker's init
+STATE = None
+# lock synchronizing access to the STATE between Tracker and StatePusher
 STATE_LOCK = threading.Lock()
+# state timestamp is changed whenever a pool member state changes,
+# this in turn used by StatePusher to determine whether it needs 
+# to push state into shared memory
 STATE_TIMESTAMP = 0
-STATE_PUSH_INTERVAL = 1
+# how long to sleep after a state push before attempting a new push
+STATE_PUSH_INTERVAL = 0.5
+
 
 class StatePusher(threading.Thread):
     
@@ -36,61 +43,76 @@ class StatePusher(threading.Thread):
     def __init__(self):
         super(StatePusher, self).__init__()
 
+        # flag the thread as daemon so it's abruptly killed
+        # when its parent process exists
+        self.daemon = True
+
         # shared memory client
-        self._sm = sharedmem.MemcacheClient(
+        self.sm = sharedmem.MemcacheClient(
             [config.BASE['SHARED_MEM_HOSTNAME']],
             socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
             server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
 
-        # last pushed state timestamp
+        # on startup do not attempt to push state
         self.state_ts = 0
-
-        self.last_push_ok = False
 
     def run(self):
         while True:
+            # initial values of states_ts should be set  to 0
+            # so we don't attempt a state push until STATE_TIMESTAMP changes
             if STATE_TIMESTAMP != self.state_ts:
                 self.push_states()
+            # sleep until the next iteration    
             time.sleep(STATE_PUSH_INTERVAL)
 
-    def push_states(self):      
-          # all memcache pushes must succeed in order to
-            # reset state changed flag
-            pushes_ok = 0
+    def push_states(self): 
+        # lock the state and generate its various forms
+        global STATE_LOCK
+        with STATE_LOCK:
+            # generate ppdns distribution form of the state
+            dist_form = STATE.to_dist_dict()
+            # generate generic form of the state
+            generic_form = util.instance_to_dict(STATE)
 
-            # push PPDNS distribution form of the state
-            val = self._sm.set(
-                config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
-                self.state.to_dist_dict())
-            if val is True:
-                pushes_ok += 1
-            else:    
-                log_msg = ('failed to write ppdns '
-                           'state to the shared memory')
-                LOG.warning(log_msg)
+        # all memcache pushes must succeed in order to
+        # reset state changed flag
+        pushes_ok = 0
 
-            # push generic form of the state
-            obj = util.instance_to_dict(self.state)
-            # add epoch time timestampt to the object
-            obj['timestamp'] = time.time()
-            val = self._sm.set(
-                config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
-                obj)
-            if val is True:
-                pushes_ok += 1
-            else:
-                log_msg = ('failed to write generic '
-                           'state to the shared memory')
-                LOG.warning(log_msg)
+        # push PPDNS distribution form of the state
+        val = self.sm.set(config.BASE['SHARED_MEM_PPDNS_STATE_KEY'],
+                           dist_form)
+        if val is True:
+            pushes_ok += 1
+        else:    
+            log_msg = ('failed to write ppdns state to the shared memory')
+            LOG.warning(log_msg)
 
-            # if all memcache pushes are successful reset 
-            # state changed flag, otherwise keep it as True
-            # so a push is attempted on the next iteration
-            if pushes_ok == 2:
-                LOG.debug('synced state to the shared memory')
-                # reset state changed flag
-                self.state_changed = False
+        # push generic form of the state
+        # add timestampt to the object
+        generic_form['timestamp'] = STATE_TIMESTAMP
+        val = self.sm.set(config.BASE['SHARED_MEM_GENERIC_STATE_KEY'],
+                           generic_form)
+        if val is True:
+            pushes_ok += 1
+        else:
+            log_msg = ('failed to write generic state to the shared memory')
+            LOG.warning(log_msg)
 
+        # push state timestamp last
+        val = self.sm.set(config.BASE['SHARED_MEM_STATE_TIMESTAMP_KEY'],
+                           STATE_TIMESTAMP)
+        if val is True:
+            pushes_ok += 1
+        else:    
+            log_msg = ('failed to write state timestamp to the shared memory')
+            LOG.warning(log_msg)
+
+        # if all memcache pushes are successful
+        # set self.state_ts to STATE_TIMESTAMP so we don't attempt to
+        # push again until STATE_TIMESTAMP changes
+        if pushes_ok == 3:
+            LOG.debug('synced state to the shared memory')
+            self.state_ts = STATE_TIMESTAMP
 
 
 class Tracker(multiprocessing.Process):
@@ -113,18 +135,21 @@ class Tracker(multiprocessing.Process):
         self.prober_responses = prober_responses
 
         # create health state table from the lb config
-        self.state = state.State(config_obj=config.LB)
+        global STATE
+        STATE = state.State(config_obj=config.LB)
 
     def run(self):
-        """Main execution loop"""
-        # init last_scan_state_time so we know when to run the first scan
-        last_scan_state_time = time.time()
+        """Main scheduling/processing loop"""
 
-        # Track whether status of any of the backend servers changed.
-        # If the state has changed we will push it to shared mem, but no more
-        # often than SCAN_STATE_INTERVAL
-        self.state_changed = False
+        # start StatePusher thread
+        # must be started from here, not __init__, in order for 
+        # global variables to be seen across both tracker and pusher
+        StatePusher().start()
 
+        # run the first scan as soon as we start
+        last_scan_state_time = 0
+
+        global STATE_LOCK
         while True:
             # read probe response and process it
             try:
@@ -135,24 +160,18 @@ class Tracker(multiprocessing.Process):
             except queue.Empty: # nothing on the queue
                 pass
             else:
-                self._process_probe(probe)
+                with STATE_LOCK:
+                    self._process_probe(probe)
 
             # periodically iterate the state and issue new probe requests,
             # if there was a state change in the last SCAN_STATE_INTERVAL,
             # push it to shared mem
             if time.time() - last_scan_state_time > SCAN_STATE_INTERVAL:
-
                 # update last scan state time
                 last_scan_state_time = time.time()
 
-                # if the state changed, update STATE_TIMESTAMP
-                # and reset self.state_changed
-                if self.state_changed:
-                    global STATE_TIMESTAMP
-                    STATE_TIMESTAMP = time.time()
-                    self.state_changed = False
-
-                    # iterate the state, issue new probe requests
+                # iterate the state, issue new probe requests
+                with STATE_LOCK:
                     self._scan_state()
 
     def _process_probe(self, probe):
@@ -165,7 +184,7 @@ class Tracker(multiprocessing.Process):
 
         # get a reference to the individual pool member 
         # based on pool_name and member_ip
-        for member in self.state.pools[probe.pool_name].members:
+        for member in STATE.pools[probe.pool_name].members:
             if member.ip == probe.member_ip:
                 break
 
@@ -176,7 +195,7 @@ class Tracker(multiprocessing.Process):
         if probe.status:
             # reset the value of retries left to the parent's pool value
             member.retries_left = \
-                self.state.pools[probe.pool_name].monitor.retries
+                STATE.pools[probe.pool_name].monitor.retries
 
             # if member is in UP state, do nothing and return
             if member.status is True:
@@ -205,8 +224,10 @@ class Tracker(multiprocessing.Process):
                 return
 
         # if we end up here, it means that there was a status change,
-        # indicate that the overall state changed
-        self.state_changed = True
+        # indicate this to State Pusher by updating global STATE_TIMESTAMP
+        global STATE_TIMESTAMP
+        STATE_TIMESTAMP = time.time()
+
         LOG.info('pool member status change: '
                 'member {member_ip}'
                 '(name: {member_name} monitor IP: {monitor_ip}) '
@@ -220,12 +241,12 @@ class Tracker(multiprocessing.Process):
                          member_status_reason=member.status_reason))
         # check if this change affects the overall pool's status
         # and generate a log message if it does
-        self._change_pool_last_status(self.state.pools[probe.pool_name])
+        self._change_pool_last_status(STATE.pools[probe.pool_name])
 
     def _scan_state(self):
         """Iterate over the state, request health probes"""
-        for pool_name in self.state.pools:
-            pool = self.state.pools[pool_name]
+        for pool_name in STATE.pools:
+            pool = STATE.pools[pool_name]
             for member in pool.members:
                 # request probe if required
                 self._request_probe(pool, member)

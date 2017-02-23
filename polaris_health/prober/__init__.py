@@ -177,6 +177,10 @@ class ProberThread(threading.Thread):
                  threads_busy_lock):
         super(ProberThread, self).__init__()
 
+        # flag the thread as daemon so it's abruptly killed when
+        # its parent process exists
+        self.daemon = True
+
         self.thread_requests = thread_requests
         self.thread_responses = thread_responses
         self.threads_busy_lock = threads_busy_lock
@@ -191,9 +195,8 @@ class ProberThread(threading.Thread):
             if probe == None:
                 return
 
-            self.threads_busy_lock.acquire()
-            _THREADS_BUSY += 1
-            self.threads_busy_lock.release()
+            with self.threads_busy_lock:
+                _THREADS_BUSY += 1
 
             # run the probe
             probe.run()
@@ -201,7 +204,6 @@ class ProberThread(threading.Thread):
             # put the Probe() on the response queue
             self.thread_responses.put(probe)
 
-            self.threads_busy_lock.acquire()
-            _THREADS_BUSY -= 1
-            self.threads_busy_lock.release()
+            with self.threads_busy_lock:
+                _THREADS_BUSY -= 1
 
