@@ -16,13 +16,18 @@ LOG.addHandler(logging.NullHandler())
 MAX_URL_PATH_LEN = 256
 MAX_HOSTNAME_LEN = 256
 
+MIN_EXPECTED_CODES_LEN = 1
+MAX_EXPECTED_CODES_LEN = 3
+MIN_EXPECTED_CODE = 100
+MAX_EXPECTED_CODE = 599
+
 
 class HTTP(BaseMonitor):
 
     """HTTP monitor"""    
 
     def __init__(self, use_ssl=False, hostname=None, url_path='/', port=None,
-                 interval=10, timeout=5, retries=2):
+                 expected_codes=None, interval=10, timeout=5, retries=2):
         """
         args:
             use_ssl: bool, whether to use SSL
@@ -31,6 +36,8 @@ class HTTP(BaseMonitor):
             url_path: str, URL url_path
             port: port number to use, by default port 80 will be used (443 if
                 use_ssl is True)
+            expected_codes: list of ints, HTTP codes to expect in a response,
+                if not provided code 200 will be expected by default
 
             Other args as per BaseMonitor() spec
         """
@@ -81,6 +88,41 @@ class HTTP(BaseMonitor):
                 LOG.error(log_msg)
                 raise Error(log_msg)
 
+        ### expected_codes ###
+        self.expected_codes = expected_codes
+        # if expected_codes hasn't been set, assign a default
+        if expected_codes is None:
+                self.expected_codes = [ 200 ]
+        # if expected_codes has been set, validate it
+        else:
+            # must be a list of a certain length
+            if not isinstance(expected_codes, list) \
+                    or len(expected_codes) < MIN_EXPECTED_CODES_LEN \
+                    or len(expected_codes) > MAX_EXPECTED_CODES_LEN:
+                log_msg = ('expected_codes "{}" must be a list between '
+                           '{} and {} elements'.
+                           format(expected_codes, 
+                                  MIN_EXPECTED_CODES_LEN,
+                                  MAX_EXPECTED_CODES_LEN))
+                LOG.error(log_msg)
+                raise Error(log_msg)
+        
+            # each code must be an int within certain boundaries
+            for code in expected_codes:
+                if not isinstance(code, int) \
+                        or code < MIN_EXPECTED_CODE \
+                        or code > MAX_EXPECTED_CODE:
+                    log_msg = ('expected code "{}" must be an int '
+                               'between {} and {}'.
+                               format(code, 
+                                      MIN_EXPECTED_CODE,
+                                      MAX_EXPECTED_CODE))
+                    LOG.error(log_msg)
+                    raise Error(log_msg)
+
+        # remove duplicate codes
+        self.expected_codes = list(set(self.expected_codes))
+
     def run(self, dst_ip):
         """Perform GET from a given dst IP address
 
@@ -102,7 +144,7 @@ class HTTP(BaseMonitor):
         except ProtocolError as e:
             raise MonitorFailed(e)
 
-        if response.status_code != 200:
+        if response.status_code not in self.expected_codes:
             raise MonitorFailed(
                 '{} {}'.format(response.status_code, response.status_reason))
 
