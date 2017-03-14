@@ -15,7 +15,7 @@ LOG.addHandler(logging.NullHandler())
 # from Python docs: For best match with hardware and network realities,
 # the value of bufsize should be a relatively small power of 2, 
 # for example, 4096.
-RECV_BUFF_SIZE = 1024
+RECV_BUFF_SIZE = 8192
 
 
 class TCPSocket:
