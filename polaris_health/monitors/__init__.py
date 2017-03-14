@@ -59,9 +59,11 @@ class BaseMonitor:
 
 from .http import HTTP
 from .tcp import TCP
+from .forced import Forced
 
 registered = {
     'http': HTTP,
     'tcp': TCP,
+    'forced': Forced,
 }            
 
