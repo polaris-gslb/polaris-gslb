@@ -101,7 +101,6 @@ if __name__ == '__main__':
                             'start',
                             'start-debug',
                             'stop',
-                            'validate-lb-config',
                             ]) 
     opts = parser.parse_args()
 
