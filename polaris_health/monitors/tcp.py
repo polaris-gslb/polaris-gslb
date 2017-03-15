@@ -124,20 +124,29 @@ class TCP(BaseMonitor):
             try:
                 recv_bytes = tcp_sock.recv()
             except ProtocolError as e:
-                log_msg = ('failed to match the regexp within the timeout, '
-                           'got {error}, '
-                           'response(up to 512 chars): {response_string}'
-                           .format(error=e,
-                                   response_string=response_string[:512]))
+                if response_string == '':
+                    log_msg = ('got {error}, no data received from the peer'
+                               .format(error=e))
+                else:        
+                    log_msg = ('failed to match the regexp within the timeout, '
+                               'got {error}, '
+                               'response(up to 512 chars): {response_string}'
+                               .format(error=e,
+                                       response_string=response_string[:512]))
                 raise MonitorFailed(log_msg)
 
             # remote side closed connection, no need to call sock.close()
             if recv_bytes == b'':
-                raise MonitorFailed('remote closed the connection, '
-                                    'failed to match the regexp in the '
-                                    'response(up to 512 chars): {}'
-                                    .format(response_string[:512]))
-        
+                if response_string == '':
+                    log_msg = ('remote closed the connection, '
+                               'no data received from the peer')
+                else:
+                    log_msg = ('remote closed the connection, '
+                               'failed to match the regexp in the '
+                               'response(up to 512 chars): {}'
+                               .format(response_string[:512]))
+                raise MonitorFailed(log_msg)
+
             # received data
             else:
                 response_string += recv_bytes.decode(errors='ignore')

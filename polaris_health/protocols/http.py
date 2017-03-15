@@ -148,19 +148,28 @@ class HTTPRequest:
             try:
                 recv_bytes = tcp_sock.recv()
             except ProtocolError as e:
-                log_msg = ('failed to find Status-Line within the timeout, '
-                           'got {error}, '
-                           'response(up to 512 chars): {response_string}'
-                           .format(error=e, 
-                                   response_string=response_string[:512]))
+                if response_string == '':
+                    log_msg = ('got {error}, no data received from the peer'
+                               .format(error=e))
+                else:    
+                    log_msg = ('failed to find Status-Line within the timeout, '
+                               'got {error}, '
+                               'response(up to 512 chars): {response_string}'
+                               .format(error=e, 
+                                       response_string=response_string[:512]))
                 raise ProtocolError(log_msg)
 
             # remote side closed connection, no need to call sock.close()
             if recv_bytes == b'':
-                raise ProtocolError('remote closed the connection, '
-                                    'failed to find Status-Line in the '
-                                    'response(up to 512 chars): {}'
-                                    .format(response_string[:128]))
+                if response_string == '':
+                    log_msg = ('remote closed the connection, '
+                               'no data received from the peer')
+                else:
+                    log_msg = ('remote closed the connection, '
+                               'failed to find Status-Line in the '
+                               'response(up to 512 chars): {}'
+                               .format(response_string[:512]))
+                raise ProtocolError(log_msg)
             else:
                 # match in the data received so far
                 response_string += recv_bytes.decode(errors='ignore')
