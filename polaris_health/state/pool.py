@@ -344,6 +344,7 @@ class Pool:
         # always build the _default distribution table
         dist_tables['_default'] = {}
         dist_tables['_default']['rotation'] = []
+        dist_tables['_default']['names'] = []
         dist_tables['_default']['num_unique_addrs'] = 0
        
         ##################
@@ -367,6 +368,7 @@ class Pool:
                 # the _default distribution table
                 for i in range(member.weight):
                     dist_tables['_default']['rotation'].append(member.ip)
+                    dist_tables['_default']['names'].append(member.name)
 
                 # increase the number of unique addresses in the _default by 1
                 dist_tables['_default']['num_unique_addrs'] += 1

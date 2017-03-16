@@ -2,6 +2,19 @@
 # Example configuration
 #
 pools:
+    ns-example:
+        monitor: tcp
+        monitor_params:
+            port: 53
+        lb_method: wrr
+        fallback: refuse
+        members:
+        - ip: 10.20.30.40
+          name: ns1.example.com
+          weight: 1
+        - ip: 10.20.30.50
+          name: ns2.example.com
+          weight: 1
     www-example:
         monitor: http
         monitor_params:
@@ -25,4 +38,17 @@ globalnames:
     www.example.com:
         pool: www-example
         ttl: 1
+        nsrecord: false
+    example.com:
+        pool: ns-example
+        ttl: 3600
+        nsrecord: true
+    ns1.example.com:
+        pool: ns-example
+        ttl: 3600
+        nsrecord: false
+    ns2.example.com:
+        pool: ns-example
+        ttl: 3600
+        nsrecord: false
 

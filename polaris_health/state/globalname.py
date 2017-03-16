@@ -17,7 +17,7 @@ class GlobalName:
 
     """Load-balnced DNS name"""
 
-    def __init__(self, name, pool_name, ttl):
+    def __init__(self, name, pool_name, ttl, nsrecord):
         """
         args:
             name: str, DNS name to be load-balanced
@@ -51,6 +51,8 @@ class GlobalName:
             LOG.error(log_msg)
             raise Error(log_msg)
 
+        self.nsrecord = nsrecord
+
     @classmethod
     def from_config_dict(cls, name, obj):
         """Build a GlobalName object from a config dict.
@@ -71,9 +73,14 @@ class GlobalName:
                        .format(name))
             LOG.error(log_msg)
             raise Error(log_msg)
- 
-        return cls(name=name, pool_name=obj['pool'], ttl=obj['ttl'])
 
+        if 'nsrecord' not in obj:
+            nsrecord_val=False
+        else:
+            nsrecord_val=obj['nsrecord']
+
+        return cls(name=name, pool_name=obj['pool'], ttl=obj['ttl'], nsrecord=nsrecord_val)
+ 
     def to_dist_dict(self):
         """Return a dict representation of the GlobalName required by 
         Polaris PDNS to perform distribution.
@@ -88,6 +95,7 @@ class GlobalName:
         obj = {}
         obj['pool_name'] = self.pool_name
         obj['ttl'] = self.ttl
+        obj['nsrecord'] = self.nsrecord
 
         return obj
 
