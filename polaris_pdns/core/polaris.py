@@ -15,7 +15,9 @@ __all__ = [ 'Polaris' ]
 
 # distribution state
 STATE = {}
-# distribution state lock
+# timestamp of the state
+STATE_TS = 0
+# lock for both STATE, STATE_TS sync between Polaris() and StateUpdater() 
 STATE_LOCK = threading.Lock() 
 # how long to sleep after attempting a state update
 STATE_UPDATE_INTERVAL = 0.5
@@ -41,16 +43,13 @@ class StateUpdater(threading.Thread):
             [config.BASE['SHARED_MEM_HOSTNAME']],
             socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'])
 
-        # current state timestamp
-        self.state_ts = 0
-
     def run(self):
         while True:
             # attempt to update state as soon as we start
             self.update_state()
             time.sleep(STATE_UPDATE_INTERVAL)
 
-    def update_state(self):      
+    def update_state(self):     
         # fetch state timestamp
         state_ts = self.sm.get(config.BASE['SHARED_MEM_STATE_TIMESTAMP_KEY'])
 
@@ -58,8 +57,9 @@ class StateUpdater(threading.Thread):
         if state_ts is None:
             return
 
+        global STATE_TS
         # if the fetched timestamp is the same as the current timestamp do nothing
-        if state_ts == self.state_ts:
+        if state_ts == STATE_TS:
             return
 
         # get distribution form of state from shared memory
@@ -69,7 +69,7 @@ class StateUpdater(threading.Thread):
         if state is None:
             return
 
-        # update STATE
+        # update STATE, STATE_TS
         global STATE, STATE_LOCK
 
         with STATE_LOCK:
@@ -77,7 +77,7 @@ class StateUpdater(threading.Thread):
             STATE = state
 
             # update state's timestamp
-            self.state_ts = state_ts
+            STATE_TS = state_ts
 
 
 class Polaris(RemoteBackend):
@@ -94,7 +94,7 @@ class Polaris(RemoteBackend):
     def run_additional_startup_tasks(self):
         """In order for global variables to work correctly 
         between StateUpdater and Polaris RemoteBackend,
-        StateUpdater thread must be started not from __init__.
+        StateUpdater thread must be started not from __init__().
         """
         # attempt to update state once so we have a state before 
         # starting to answer queries 
@@ -236,22 +236,26 @@ class Polaris(RemoteBackend):
             self.result = False
             return
 
-        # append ns with a dot here
-        ns = '{}.'.format(config.BASE['HOSTNAME'])
-        contact = 'hostmaster.{}'.format(ns)                  
-        content = ('{ns} {contact} {serial} {retry} {expire} {min_ttl}'.
-                   format(ns=ns,
-                          contact=contact,
-                          serial=1,
-                          retry=600,
-                          expire=86400,
-                          min_ttl=1))
+        # determine the value of SOA serial, 
+        # either static or rounded state's timestamp
+        if config.BASE['SOA_SERIAL'] == 'auto':
+            serial = int(STATE_TS)
+        else:
+            serial = config.BASE['SOA_SERIAL']
+
+        content = ('{mname} {rname} {serial} {refresh} {retry} {expire} {minimum}'.
+                   format(mname=config.BASE['SOA_MNAME'],
+                          rname=config.BASE['SOA_RNAME'],
+                          serial=serial,
+                          refresh=config.BASE['SOA_REFRESH'],
+                          retry=config.BASE['SOA_RETRY'],
+                          expire=config.BASE['SOA_EXPIRE'],
+                          minimum=config.BASE['SOA_MINIMUM']))
 
         # add record to the response
         self.add_record(qtype='SOA',
                         # use the original qname from parameters dict
                         qname=params['qname'],
                         content=content,
-                        ttl=60)
+                        ttl=config.BASE['SOA_TTL'])
 
-       
