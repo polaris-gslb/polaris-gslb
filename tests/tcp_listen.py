@@ -10,10 +10,9 @@ def main():
  
     while 1:
         conn, addr = s.accept()
-        data = conn.recv(1024)
+        #data = conn.recv(1024)
+        conn.send("blabla".encode())
         conn.close()
-        #conn.send(data)
-
 
 if __name__ == '__main__':
     main()

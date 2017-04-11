@@ -5,7 +5,9 @@ import yaml
 obj = { 
     'pools': {
             'www-example': {
-                    'monitor': 'forced',
+                    'monitor': 'tcp',
+                    'monitor_params': {
+                            }
                     'lb_method': 'wrr',
                     'max_addrs_returned': 1024,
                     'members': []
@@ -18,7 +20,7 @@ obj = {
                     }
             }
 }
-for b in range(5):
+for b in range(10):
     for i in range(256):
         m = {
             'ip': '127.0.%s.%s' % (b, i),
