@@ -11,7 +11,7 @@ An extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic man
     * TCP
         * Connect to a specific port number
         * Send string
-        * Match regular expression in a response
+        * Match regular expression in response
     * HTTP/S
         * Port number to use
         * SSL
@@ -21,9 +21,10 @@ An extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic man
 * Different ways to handle the "all-pool-members-down" situation(fallback):
     * return any configured end-points(ignore the health status) 
     * refuse query
+* Automatic SOA serial
 * A single Health Tracker can serve multiple DNS resolvers running on different machines
 * LB configuration validation on start-up operations
-* Dynamic threads pool used for health checking
+* Elastic threads pool serving health checks
 * Asynchronous, non-blocking comms between the internal components
 
 See the [WIKI](https://github.com/polaris-gslb/polaris-core/wiki) for installation, configuration and other information.
