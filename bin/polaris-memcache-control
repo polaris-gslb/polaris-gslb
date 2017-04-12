@@ -8,7 +8,6 @@ import json
 import memcache
 
 
-SHARED_MEM_HOSTNAME = '127.0.0.1'
 SHARED_MEM_GENERIC_STATE_KEY = 'polaris_health:generic_state'
 SHARED_MEM_PPDNS_STATE_KEY = 'polaris_health:ppdns_state'
 SHARED_MEM_HEARTBEAT_KEY = 'polaris_health:heartbeat'
@@ -17,16 +16,21 @@ SHARED_MEM_HEARTBEAT_KEY = 'polaris_health:heartbeat'
 def main():
     parser = argparse.ArgumentParser(
         description="Polaris memcache control")
+
+    parser.add_argument('hostname', help='shared mem hostname')
+
     parser.add_argument('action',
                         choices=[
                             'get-generic-state',
                             'get-ppdns-state',
                             'get-heartbeat',
                             'check-heartbeat'
-                            ]) 
+                            ],
+                        help='action to perform')
+
     opts = parser.parse_args()
 
-    pmc = PolarisMemcacheControl()
+    pmc = PolarisMemcacheControl(hostname=opts.hostname)
 
     method = opts.action.replace('-', '_')
     getattr(pmc, method)()
@@ -34,8 +38,8 @@ def main():
 
 class PolarisMemcacheControl:
 
-    def __init__(self):
-        self._mc = memcache.Client([SHARED_MEM_HOSTNAME])
+    def __init__(self, hostname):
+        self._mc = memcache.Client([hostname])
 
     def get_generic_state(self):
         """Get generic form of the state"""
@@ -81,4 +85,3 @@ class PolarisMemcacheControl:
 
 if __name__ == '__main__':
     main()
-
