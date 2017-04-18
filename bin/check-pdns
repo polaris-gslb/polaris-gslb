@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PDNS_CONTROL_CMD="/usr/local/bin/pdns_control"
+PDNS_CONTROL_CMD="/usr/bin/pdns_control"
 
 $PDNS_CONTROL_CMD status ; EC=$?
 if test "$EC" != "0"
