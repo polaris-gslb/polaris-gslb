@@ -86,7 +86,6 @@ case "$1" in
 
     start-debug)
         echo "Starting Polaris Health in debug mode... "
-
         doControl start-debug
     ;;
 
