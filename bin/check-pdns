@@ -2,7 +2,7 @@
 
 PDNS_CONTROL_CMD="/usr/bin/pdns_control"
 
-$PDNS_CONTROL_CMD status ; EC=$?
+$PDNS_CONTROL_CMD rping ; EC=$?
 if test "$EC" != "0"
 then
     echo "failed!"
@@ -10,4 +10,3 @@ then
 else
     echo "ok"
 fi
-
