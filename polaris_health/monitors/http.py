@@ -49,6 +49,10 @@ class HTTP(BaseMonitor):
 
         ### use_ssl ###
         self.use_ssl = use_ssl
+        if not isinstance(use_ssl, bool):
+            log_msg = 'use_ssl "{}" must be a bool'.format(use_ssl)
+            LOG.error(log_msg)
+            raise Error(log_msg)
 
         ### url_path ###
         self.url_path = url_path
