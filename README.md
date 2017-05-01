@@ -16,7 +16,7 @@ An extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic man
         * Port number to use.
         * SSL.
         * Request a specific URL path.
-        * Expect a response code from a configurable list.
+        * Expect a response code from a configurable array.
     * Forced
         * Force a member to be up or down, disables health checking. 
 * Ability to run health checks against an IP that is different from the member IP. 
