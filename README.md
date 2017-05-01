@@ -17,6 +17,8 @@ An extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic man
         * SSL.
         * Request a specific URL path.
         * Expect a response code from a configurable list.
+    * Forced
+        * Force a member to be up or down, disables health checking. 
 * Ability to run health checks against an IP that is different from the member IP. 
 * Up to 1024 addresses returned in a response.
 * Different ways to handle the "all-pool-members-down" situation(fallback):
