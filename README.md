@@ -24,7 +24,7 @@ An extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic man
 * Different ways to handle the "all-pool-members-down" situation(fallback):
     * Return any configured end-points(ignore the health status).
     * Refuse query.
-* Automatic SOA serial
+* Automatic SOA serial.
 * A single Health Tracker can serve multiple DNS resolvers running on different machines.
 * LB configuration validation on start-up operations.
 * Elastic threads pool serving health checks.
