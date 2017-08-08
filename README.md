@@ -1,6 +1,6 @@
 ## Polaris - guiding the traffic home.
 
-An extendable Global Server Load Balancing(GSLB) solution, DNS-based traffic manager.
+An extendable high availability solution for the data center and beyond, Global Server Load Balancing(GSLB), DNS-based traffic manager.
 
 * Built as an enhancement for [PowerDNS Authoritative Server](https://www.powerdns.com/auth.html).
 * Load-balancing methods:
