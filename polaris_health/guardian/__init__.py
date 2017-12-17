@@ -26,7 +26,7 @@ CONTROL_SOCKET_TIMEOUT = 0.5
 # control socket recv() buffer size 
 CONTROL_SOCKET_RECV_BUFF_SIZE = 256
 
-# how often in seconds a heartbeat is written, heartbeat TTL is set to + 1
+# how often in seconds a heartbeat is written, heartbeat TTL is set to + 4
 HEARTBEAT_INTERVAL = 1
 
 # maximum number of times to .terminate() an alive process
@@ -258,7 +258,7 @@ class Guardian:
                 obj = { 'timestamp': time.time() }
                 val = self._sm.set(config.BASE['SHARED_MEM_HEARTBEAT_KEY'],
                                    json.dumps(obj), 
-                                   HEARTBEAT_INTERVAL + 1)
+                                   HEARTBEAT_INTERVAL + 4)
                 if val is not True:
                     log_msg = 'failed to write heartbeat to the shared memory'
                     LOG.warning(log_msg)
