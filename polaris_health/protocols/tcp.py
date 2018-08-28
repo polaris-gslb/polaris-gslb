@@ -34,8 +34,11 @@ class TCPSocket:
         self.auto_timeout = auto_timeout
 
         # create socket
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
+        if ':' in ip:
+            self._sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         self.settimeout(self.timeout)
 
     def connect(self):

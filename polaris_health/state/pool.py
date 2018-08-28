@@ -59,11 +59,6 @@ class PoolMember:
             LOG.error(log_msg)
             raise Error(log_msg)
 
-        if _ip.version != 4:
-            log_msg = 'only v4 IP addresses are currently supported'
-            LOG.error(log_msg)
-            raise Error(log_msg)
-
         self.ip = ip
 
         ### name
@@ -102,11 +97,6 @@ class PoolMember:
             except ValueError:
                 log_msg = ('"{}" does not appear to be a valid IP address'
                            .format(monitor_ip))
-                LOG.error(log_msg)
-                raise Error(log_msg)
-
-            if _ip.version != 4:
-                log_msg = 'only v4 IP addresses are currently supported'
                 LOG.error(log_msg)
                 raise Error(log_msg)
 
