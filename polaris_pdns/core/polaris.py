@@ -199,7 +199,7 @@ class Polaris(RemoteBackend):
 
         responses=[]
         ### add records to the response ###
-        for i in range(len(dist_table['rotation']):
+        for i in range(len(dist_table['rotation'])):
             if ':' in dist_table['rotation'][dist_table['index']]:
                 qtype='AAAA'
             else:
