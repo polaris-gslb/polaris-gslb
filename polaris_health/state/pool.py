@@ -240,7 +240,7 @@ class Pool:
             monitor_params = obj['monitor_params']
         else:
             monitor_params = {}
-                 
+
         monitor = monitors.registered[monitor_name](**monitor_params)
 
         ### lb_method
@@ -367,43 +367,27 @@ class Pool:
         dist_tables['_default'] = {}
         dist_tables['_default']['rotation'] = []
         dist_tables['_default']['num_unique_addrs'] = 0
-       
+
+        # do not add members with weight of 0 - member is disabled
+        members = [m for m in self.members if m.weight != 0]
+
         ##################
         ### pool is UP ###
         ##################
         if self.status:
-            for member in self.members:
-                # do not add members with the weight of 0 - member is disabled
-                if member.weight == 0:
-                    continue
+            # do not add members in DOWN state
+            members = [m for m in self.members if m.status]
 
-                # do not add members in DOWN state
-                if not member.status:
-                    continue
+            if self.lb_method == 'twrr':
+                for member in members:
+                    # add the member IP times it's weight into
+                    # the _default distribution table
+                    for i in range(member.weight):
+                        dist_tables['_default']['rotation'].append(member.ip)
 
-                #
-                # add to the _default table
-                #
+                    # increase the number of unique addresses in the _default by 1
+                    dist_tables['_default']['num_unique_addrs'] += 1
 
-                # add the member IP times it's weight into 
-                # the _default distribution table
-                for i in range(member.weight):
-                    dist_tables['_default']['rotation'].append(member.ip)
-
-                # increase the number of unique addresses in the _default by 1
-                dist_tables['_default']['num_unique_addrs'] += 1
-       
-                # if lb_method is failover group do not add any more members
-                if self.lb_method == 'fogroup':
-                    break
-
-                #
-                # add to a regional table
-                #
-
-                # if a topology lb method is used, add the member's IP 
-                # to a corresponding regional table 
-                if self.lb_method == 'twrr':
                     # create the regional table if it does not exist
                     if member.region not in dist_tables:
                         dist_tables[member.region] = {}
@@ -419,15 +403,32 @@ class Pool:
                     # increase the number of unique addresses in the table by 1
                     dist_tables[member.region]['num_unique_addrs'] += 1
 
+            elif self.lb_method == 'fogroup':
+                ip4 = sorted([m for m in members if ':' not in m.ip],
+                        key=lambda k: k.weight, reverse=True)
+                ip6 = sorted([m for m in members if ':' in m.ip],
+                        key=lambda k: k.weight, reverse=True)
+
+                members = []
+                if ip4:
+                    members.append(ip4[0])
+                if ip6:
+                    members.append(ip6[0])
+
+                for member in members:
+                    # add the member IP times it's weight into
+                    # the _default distribution table
+                    for i in range(member.weight):
+                        dist_tables['_default']['rotation'].append(member.ip)
+
+                    # increase the number of unique addresses in the _default by 1
+                    dist_tables['_default']['num_unique_addrs'] += 1
+
         ####################
         ### pool is DOWN ###
         ####################
         else:
-            for member in self.members:
-                # do not add members with weight of 0 - member is disabled
-                if member.weight == 0:
-                    continue
-
+            for member in members:
                 # add to the _default table if fallback is set to 'any'
                 if self.fallback == 'any':
                     # add the member IP times it's weight into
@@ -445,13 +446,13 @@ class Pool:
         for name in dist_tables:
             # randomly shuffle the rotation list
             random.shuffle(dist_tables[name]['rotation']) 
-       
+
             # create index used by ppdns for distribution,
             # set it to a random position, when ppdns is
             # syncing its internal state from shared memory, indexes gets
             # reset, we want to avoid starting from 0 every time
             dist_tables[name]['index'] = \
-                int(random.random() * len(dist_tables[name]['rotation'])) 
+                int(random.random() * len(dist_tables[name]['rotation']))
 
         obj['dist_tables'] = dist_tables
 
