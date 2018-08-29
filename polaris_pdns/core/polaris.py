@@ -222,27 +222,41 @@ class Polaris(RemoteBackend):
         # TODO: remove dublicates from responses
 
         # sort records by type
-        if params['qtype'] == 'A':
-            responses = [r for r in responses if r['qtype'] == 'A']
-        elif params['qtype'] == 'AAAA':
-            responses = [r for r in responses if r['qtype'] == 'AAAA']
-
-        # determine how many records to return
-        # which is the minimum of the dist table's num_unique_addrs and 
-        # the pool's max_addrs_returned
-        if len(responses) <= pool['max_addrs_returned']:
-            num_records_return = len(responses)
-        else:
-            num_records_return = pool['max_addrs_returned']
+        ip4 = [r for r in responses if r['qtype'] == 'A']
+        ip6 = [r for r in responses if r['qtype'] == 'AAAA']
 
         # if we don't have anything to return(all member weights may have
         # been set of 0), set the result to false
-        if num_records_return == 0:
-            self.result = False
-            return
+        if (pool['max_addrs_returned'] == 0 or
+            (params['qtype'] == 'A' and len(ip4) == 0) or
+            (params['qtype'] == 'AAAA' and len(ip6) == 0) or
+            len(responses) == 0):
+                self.result = False
+                return
 
-        for r in responses[:num_records_return]:
-            self.add_record(**r)
+        if params['qtype'] in ('ANY', 'A'):
+            # determine how many records to return
+            # which is the minimum of the dist table's num_unique_addrs and
+            # the pool's max_addrs_returned
+            if len(ip4) <= pool['max_addrs_returned']:
+                num_records_return = len(ip4)
+            else:
+                num_records_return = pool['max_addrs_returned']
+
+            for r in ip4[:num_records_return]:
+                self.add_record(**r)
+
+        if params['qtype'] in ('ANY', 'AAAA'):
+            # determine how many records to return
+            # which is the minimum of the dist table's num_unique_addrs and
+            # the pool's max_addrs_returned
+            if len(ip6) <= pool['max_addrs_returned']:
+                num_records_return = len(ip6)
+            else:
+                num_records_return = pool['max_addrs_returned']
+
+            for r in ip6[:num_records_return]:
+                self.add_record(**r)
 
     def _soa_response(self, params):
         """Generate a response to a SOA query."""
