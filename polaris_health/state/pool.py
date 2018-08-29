@@ -378,7 +378,7 @@ class Pool:
             # do not add members in DOWN state
             members = [m for m in self.members if m.status]
 
-            if self.lb_method == 'twrr':
+            if self.lb_method in ('twrr', 'wrr'):
                 for member in members:
                     # add the member IP times it's weight into
                     # the _default distribution table
@@ -388,20 +388,21 @@ class Pool:
                     # increase the number of unique addresses in the _default by 1
                     dist_tables['_default']['num_unique_addrs'] += 1
 
-                    # create the regional table if it does not exist
-                    if member.region not in dist_tables:
-                        dist_tables[member.region] = {}
-                        dist_tables[member.region]['rotation'] = []
-                        dist_tables[member.region]['num_unique_addrs'] = 0
+                    if self.lb_method == 'twrr':
+                        # create the regional table if it does not exist
+                        if member.region not in dist_tables:
+                            dist_tables[member.region] = {}
+                            dist_tables[member.region]['rotation'] = []
+                            dist_tables[member.region]['num_unique_addrs'] = 0
 
-                    # add the member IP times it's weight
-                    # into the regional table
-                    for i in range(member.weight):
-                        dist_tables[member.region]['rotation'].append(
-                            member.ip)
+                        # add the member IP times it's weight
+                        # into the regional table
+                        for i in range(member.weight):
+                            dist_tables[member.region]['rotation'].append(
+                                member.ip)
 
-                    # increase the number of unique addresses in the table by 1
-                    dist_tables[member.region]['num_unique_addrs'] += 1
+                        # increase the number of unique addresses in the table by 1
+                        dist_tables[member.region]['num_unique_addrs'] += 1
 
             elif self.lb_method == 'fogroup':
                 ip4 = sorted([m for m in members if ':' not in m.ip],
