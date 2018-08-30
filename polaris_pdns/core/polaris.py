@@ -119,7 +119,7 @@ class Polaris(RemoteBackend):
                 return
 
             # ANY/A response
-            if params['qtype'] == 'ANY' or params['qtype'] == 'A':
+            if params['qtype'] in ('ANY', 'A', 'AAAA'):
                 self._any_response(params)
                 return
 
@@ -148,7 +148,7 @@ class Polaris(RemoteBackend):
         # get a pool associated with the qname
         pool_name = STATE['globalnames'][qname]['pool_name']
         pool = STATE['pools'][pool_name]
-       
+
         # use the _default distribution table by default
         dist_table = pool['dist_tables']['_default']
 
@@ -196,34 +196,67 @@ class Polaris(RemoteBackend):
         self.log.append('dist table used: {}'
                         .format(json.dumps(dist_table)))
 
-        # determine how many records to return
-        # which is the minimum of the dist table's num_unique_addrs and 
-        # the pool's max_addrs_returned
-        if dist_table['num_unique_addrs'] <= pool['max_addrs_returned']: 
-            num_records_return = dist_table['num_unique_addrs']
-        else:    
-            num_records_return = pool['max_addrs_returned']
 
-        # if we don't have anything to return(all member weights may have
-        # been set of 0), set the result to false
-        if num_records_return == 0:
-            self.result = False
-            return
-
+        responses=[]
         ### add records to the response ###
-        for i in range(num_records_return):
-            # add record to the response
-            self.add_record(qtype='A',
-                            # use the original qname from the parameters dict        
-                            qname=params['qname'],
-                            content=dist_table['rotation'][dist_table['index']],
-                            ttl=STATE['globalnames'][qname]['ttl'])    
+        for i in range(len(dist_table['rotation'])):
+            if ':' in dist_table['rotation'][dist_table['index']]:
+                qtype='AAAA'
+            else:
+                qtype='A'
+            # add record to the responses
+            responses.append(
+                {'qtype': qtype,
+                # use the original qname from the parameters dict
+                'qname': params['qname'],
+                'content': dist_table['rotation'][dist_table['index']],
+                'ttl': STATE['globalnames'][qname]['ttl']
+                })
 
             # increase index
             dist_table['index'] += 1
             # set the index to 0 if we reached the end of the rotation list
             if dist_table['index'] >= len(dist_table['rotation']):
                 dist_table['index'] = 0
+
+        # TODO: remove dublicates from responses
+
+        # sort records by type
+        ip4 = [r for r in responses if r['qtype'] == 'A']
+        ip6 = [r for r in responses if r['qtype'] == 'AAAA']
+
+        # if we don't have anything to return(all member weights may have
+        # been set of 0), set the result to false
+        if (pool['max_addrs_returned'] == 0 or
+            (params['qtype'] == 'A' and len(ip4) == 0) or
+            (params['qtype'] == 'AAAA' and len(ip6) == 0) or
+            len(responses) == 0):
+                self.result = False
+                return
+
+        if params['qtype'] in ('ANY', 'A'):
+            # determine how many records to return
+            # which is the minimum of the dist table's num_unique_addrs and
+            # the pool's max_addrs_returned
+            if len(ip4) <= pool['max_addrs_returned']:
+                num_records_return = len(ip4)
+            else:
+                num_records_return = pool['max_addrs_returned']
+
+            for r in ip4[:num_records_return]:
+                self.add_record(**r)
+
+        if params['qtype'] in ('ANY', 'AAAA'):
+            # determine how many records to return
+            # which is the minimum of the dist table's num_unique_addrs and
+            # the pool's max_addrs_returned
+            if len(ip6) <= pool['max_addrs_returned']:
+                num_records_return = len(ip6)
+            else:
+                num_records_return = pool['max_addrs_returned']
+
+            for r in ip6[:num_records_return]:
+                self.add_record(**r)
 
     def _soa_response(self, params):
         """Generate a response to a SOA query."""

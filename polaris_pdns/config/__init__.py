@@ -13,7 +13,7 @@ BASE = {
 
     'SHARED_MEM_HOSTNAME': '127.0.0.1',
     'SHARED_MEM_STATE_TIMESTAMP_KEY': 'polaris_health:state_timestamp',
-    'SHARED_MEM_PPDNS_STATE_KEY': 'polaris_health:ppdns_state',    
+    'SHARED_MEM_PPDNS_STATE_KEY': 'polaris_health:ppdns_state',
     'SHARED_MEM_SOCKET_TIMEOUT': 1,
 
     'LOG': False,

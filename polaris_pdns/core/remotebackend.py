@@ -15,11 +15,11 @@ class RemoteBackend:
 
     """PowerDNS Remote Backend handler 
 
-    Implements pipe handler for PowerDNS Remote Backend JSON API:      
+    Implements pipe handler for PowerDNS Remote Backend JSON API:
     https://doc.powerdns.com/md/authoritative/backend-remote/
 
     Child classes must implement self.do_<something>(params)
-    methods for JSON API calls they need to handle, where <something> 
+    methods for JSON API calls they need to handle, where <something>
     must match an exact JSON API method name.
     """
 
