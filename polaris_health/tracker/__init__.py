@@ -53,13 +53,13 @@ class StatePusher(threading.Thread):
             socket_timeout=config.BASE['SHARED_MEM_SOCKET_TIMEOUT'],
             server_max_value_length=config.BASE['SHARED_MEM_SERVER_MAX_VALUE_LENGTH'])
 
-        # on startup do not attempt to push state
+        # on startup state_ts == STATE_TIMESTAMP == 0
         self.state_ts = 0
 
     def run(self):
         while True:
-            # initial values of states_ts should be set  to 0
-            # so we don't attempt a state push until STATE_TIMESTAMP changes
+            # push the states whenever STATE_TIMESTAMP changes
+            # (but only after the health status has fully converged)
             if STATE_TIMESTAMP != self.state_ts:
                 self.push_states()
             # sleep until the next iteration    
@@ -69,13 +69,18 @@ class StatePusher(threading.Thread):
         # lock the state and generate its various forms
         global STATE_LOCK
         with STATE_LOCK:
+            # do not push states until every member's health status
+            # has been determined
+            if not STATE.health_converged:
+                return
+
             # generate ppdns distribution form of the state
             dist_form = STATE.to_dist_dict()
             # generate generic form of the state
             generic_form = util.instance_to_dict(STATE)
 
         # all memcache pushes must succeed in order to
-        # reset state changed flag
+        # update the state pushed flag(self.state_ts)
         pushes_ok = 0
 
         # push PPDNS distribution form of the state
@@ -229,10 +234,10 @@ class Tracker(multiprocessing.Process):
         STATE_TIMESTAMP = time.time()
 
         LOG.info('pool member status change: '
-                'member {member_ip}'
-                '(name: {member_name} monitor IP: {monitor_ip}) '
-                'of pool {pool_name} is {member_status}, '
-                'reason: {member_status_reason}'
+                 'member {member_ip}'
+                 '(name: {member_name} monitor IP: {monitor_ip}) '
+                 'of pool {pool_name} is {member_status}, '
+                 'reason: {member_status_reason}'
                  .format(member_ip=probe.member_ip,
                          member_name=member.name,
                          monitor_ip=member.monitor_ip,

@@ -24,6 +24,30 @@ class State:
     def __init__(self, config_obj):
         self._from_config_dict(config_obj)
 
+        # a list of all pools members used in determining 
+        # the health status convergence progress
+        self._status_undetermined = []
+        for pool_name in self.pools:
+            for member in self.pools[pool_name].members:
+                self._status_undetermined.append(member)
+
+    @property
+    def health_converged(self):
+        """Return True if all pools members status has been
+        determined(not None), False otherwise.
+        """
+        # all pools members status is determined
+        if len(self._status_undetermined) == 0:
+            return True
+
+        while len(self._status_undetermined) > 0:
+            if self._status_undetermined[0].status is None:
+                    return False
+            self._status_undetermined.pop(0)
+
+        LOG.info("health status convergence complete") 
+        return True
+
     def to_dist_dict(self):
         """Return a dict representation of self required by Polaris PDNS
         to perform query distribution.

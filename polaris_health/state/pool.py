@@ -458,7 +458,7 @@ class Pool:
        
             # create index used by ppdns for distribution,
             # set it to a random position, when ppdns is
-            # syncing its internal state from shared memory, indexes gets
+            # syncing its internal state from shared memory, the index gets
             # reset, we want to avoid starting from 0 every time
             dist_tables[name]['index'] = \
                 int(random.random() * len(dist_tables[name]['rotation'])) 
@@ -466,4 +466,3 @@ class Pool:
         obj['dist_tables'] = dist_tables
 
         return obj
-
