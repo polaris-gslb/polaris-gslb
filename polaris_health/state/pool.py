@@ -123,10 +123,6 @@ class PoolMember:
         # reason why this status has been set
         self.status_reason = None
 
-        # timestamp when the probe was issued last time
-        # used to determine when to send a new probe
-        self.last_probe_issued_time = None
-
         # this is used by tracker to determine how many more
         # probing requests to attempt before declaring the member down
         # set to the parent's pool monitor retries value initially
