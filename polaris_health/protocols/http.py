@@ -119,10 +119,11 @@ class HTTPRequest:
         """
         # set the value of the Host header, use hostname if provided,
         # IP address otherwise
-        host = self.ip
         if self.hostname:
             host = self.hostname
-        
+        else:
+            host = self.ip
+
         # construct the request string
         req_str = ('{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'.
                    format(method, self.url_path, host))
