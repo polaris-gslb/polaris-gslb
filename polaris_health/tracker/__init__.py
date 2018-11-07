@@ -84,7 +84,7 @@ class StatePusher(threading.Thread):
             pushes_ok += 1
         else:    
             log_msg = ('failed to write ppdns state to the shared memory')
-            LOG.warning(log_msg)
+            LOG.error(log_msg)
 
         # push generic form of the state
         # add timestampt to the object
@@ -95,7 +95,7 @@ class StatePusher(threading.Thread):
             pushes_ok += 1
         else:
             log_msg = ('failed to write generic state to the shared memory')
-            LOG.warning(log_msg)
+            LOG.error(log_msg)
 
         # push state timestamp last
         val = self.sm.set(config.BASE['SHARED_MEM_STATE_TIMESTAMP_KEY'],
@@ -104,7 +104,7 @@ class StatePusher(threading.Thread):
             pushes_ok += 1
         else:    
             log_msg = ('failed to write state timestamp to the shared memory')
-            LOG.warning(log_msg)
+            LOG.error(log_msg)
 
         # if all memcache pushes are successful
         # set self.state_ts to STATE_TIMESTAMP so we don't attempt to
