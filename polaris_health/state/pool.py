@@ -123,10 +123,6 @@ class PoolMember:
         # reason why this status has been set
         self.status_reason = None
 
-        # timestamp when the probe was issued last time
-        # used to determine when to send a new probe
-        self.last_probe_issued_time = None
-
         # this is used by tracker to determine how many more
         # probing requests to attempt before declaring the member down
         # set to the parent's pool monitor retries value initially
@@ -458,7 +454,7 @@ class Pool:
        
             # create index used by ppdns for distribution,
             # set it to a random position, when ppdns is
-            # syncing its internal state from shared memory, indexes gets
+            # syncing its internal state from shared memory, the index gets
             # reset, we want to avoid starting from 0 every time
             dist_tables[name]['index'] = \
                 int(random.random() * len(dist_tables[name]['rotation'])) 
@@ -466,4 +462,3 @@ class Pool:
         obj['dist_tables'] = dist_tables
 
         return obj
-

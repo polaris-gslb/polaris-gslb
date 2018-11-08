@@ -261,7 +261,7 @@ class Guardian:
                                    HEARTBEAT_INTERVAL + 4)
                 if val is not True:
                     log_msg = 'failed to write heartbeat to the shared memory'
-                    LOG.warning(log_msg)
+                    LOG.error(log_msg)
 
                 t_last = t_now
 

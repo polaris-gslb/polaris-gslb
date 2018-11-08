@@ -106,26 +106,30 @@ class Polaris(RemoteBackend):
     def do_lookup(self, params):
         """
         args:
-            params: 'parameters' dict from PowerDNS JSON API request
+            params: 'parameters' dict from PowerDNS JSON API request.
         """
+        # normalize the qname, starting from v4.0 remote backend
+        # sends qnames with a trailing dot
+        qname = params['qname'].rstrip('.').lower()
+
         global STATE_LOCK
         with STATE_LOCK:
             # respond with False if there is no globalname corresponding
             # to the qname, this will result in REFUSED in the front-end
-            if params['qname'].lower() not in STATE['globalnames']:
+            if qname not in STATE['globalnames']:
                 self.log.append(
-                    'no globalname found for qname "{}"'.format(params['qname']))
+                    'no globalname found for qname "{}"'.format(qname))
                 self.result = False
                 return
 
             # ANY/A response
             if params['qtype'] == 'ANY' or params['qtype'] == 'A':
-                self._any_response(params)
+                self._any_response(params, qname)
                 return
 
             # SOA response
             if params['qtype'] == 'SOA':
-                self._soa_response(params)
+                self._soa_response(params, qname)
                 return
 
             # REFUSE otherwise
@@ -137,14 +141,12 @@ class Polaris(RemoteBackend):
         """
         self.result = False
 
-    def _any_response(self, params):
+    def _any_response(self, params, qname):
         """Generate a response to ANY/A query.
 
-        See polaris_health.state to_dist_dict() methods for the distribution
+        See polaris_health.State.to_dist_dict() methods for the distribution
         state implementation details.
         """
-        qname = params['qname'].lower()
-
         # get a pool associated with the qname
         pool_name = STATE['globalnames'][qname]['pool_name']
         pool = STATE['pools'][pool_name]
@@ -205,7 +207,7 @@ class Polaris(RemoteBackend):
             num_records_return = pool['max_addrs_returned']
 
         # if we don't have anything to return(all member weights may have
-        # been set of 0), set the result to false
+        # been set to 0), set the result to false
         if num_records_return == 0:
             self.result = False
             return
@@ -219,17 +221,16 @@ class Polaris(RemoteBackend):
                             content=dist_table['rotation'][dist_table['index']],
                             ttl=STATE['globalnames'][qname]['ttl'])    
 
-            # increase index
+            # increment index
             dist_table['index'] += 1
             # set the index to 0 if we reached the end of the rotation list
             if dist_table['index'] >= len(dist_table['rotation']):
                 dist_table['index'] = 0
 
-    def _soa_response(self, params):
+    def _soa_response(self, params, qname):
         """Generate a response to a SOA query."""
         # if pool is DOWN and fallback is set to "refuse", refuse SOA queries
         # when both SOA any ANY results in False the pdns will produce a REFUSE
-        qname = params['qname'].lower()
         pool_name = STATE['globalnames'][qname]['pool_name']
         pool = STATE['pools'][pool_name]
         if not pool['status'] and pool['fallback'] == 'refuse':

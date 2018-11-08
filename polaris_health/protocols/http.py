@@ -117,14 +117,16 @@ class HTTPRequest:
         returns:
             Response() object
         """
-        # construct request string
-        host_header = ''
+        # set the value of the Host header, use hostname if provided,
+        # IP address otherwise
         if self.hostname:
-            host_header = 'Host: {}\r\n'.format(self.hostname)
-        
-        # "Host:" header must be provided when using SNI
-        req_str = ('{} {} HTTP/1.0\r\n{}Connection: close\r\n\r\n'.
-                   format(method, self.url_path, host_header))
+            host = self.hostname
+        else:
+            host = self.ip
+
+        # construct the request string
+        req_str = ('{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'.
+                   format(method, self.url_path, host))
 
         # create a socket
         tcp_sock = tcp.TCPSocket(ip=self.ip, port=self.port,
