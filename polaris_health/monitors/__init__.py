@@ -60,10 +60,12 @@ class BaseMonitor:
 from .http import HTTP
 from .tcp import TCP
 from .forced import Forced
+from .external import External
 
 registered = {
     'http': HTTP,
     'tcp': TCP,
     'forced': Forced,
+    'external': External,
 }            
 
