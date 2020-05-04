@@ -78,13 +78,14 @@ class External(BaseMonitor):
             dst_ip: string, IP address to connect to
         returns:
             None
-
         raises:
             MonitorFailed() on process timeout or if output does not match result string
             or command returns a non 0 response.
         """
+        # force what ever args into strings or subprocess.run will crash
+        command = list(map(str, [self.file_path, dst_ip, self.port] + self.args))
         try:
-            cmd = subprocess.run([], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            cmd = subprocess.run(command, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                         timeout=self.timeout)
         except subprocess.TimeoutExpired as e:
             log_msg = ('command timeout reached: {error}'
@@ -97,8 +98,8 @@ class External(BaseMonitor):
             if cmd.stdout.rstrip() == self.result:
                 return
             else:
-                log_msg = ('The external check returned:{} not {}'.format(cmd.stdout, self.result))
+                log_msg = ('The external check returned:{} not {}'.format(cmd.stdout.rstrip(), self.result))
                 raise MonitorFailed(log_msg)
         else:
-            log_msg = ('External Check Failed: Reason: {}'.format(cmd.stderr))
+            log_msg = ('External Check Failed: Reason: {}'.format(cmd.stderr.rstrip()))
             raise MonitorFailed(log_msg)
