@@ -73,12 +73,33 @@ class StateUpdater(threading.Thread):
         global STATE, STATE_LOCK
 
         with STATE_LOCK:
+            # Copy Distribution table indexes
+            state = self.sync_dist_table_indexes(STATE, state)
+
             # point STATE to the fetched state
             STATE = state
 
             # update state's timestamp
             STATE_TS = state_ts
 
+    def sync_dist_table_indexes(self, old_state, new_state):
+        new_state_pools = old_state_pools = []
+        if "pools" in new_state:
+            new_state_pools = new_state["pools"]
+        if "pools" in old_state:
+            old_state_pools = old_state["pools"]
+        for pool in new_state["globalnames"]:
+            pool_name = new_state['globalnames'][pool]['pool_name']
+            if pool_name in old_state_pools:
+                old_dist_table = old_state_pools[pool_name]['dist_tables']['_default']
+                new_dist_table = new_state_pools[pool_name]['dist_tables']['_default']
+                if old_dist_table["index"] != new_dist_table["index"]:
+                    if old_dist_table['index'] >= len(new_dist_table['rotation']):
+                        new_dist_table['index'] = 0
+                    else:
+                        new_dist_table['index'] = old_dist_table['index']
+
+        return new_state
 
 class Polaris(RemoteBackend):
     
